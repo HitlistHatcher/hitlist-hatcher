@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hitlist Hatcher 3.0</title>
+
+  <!--
+    ============================================================
+    HITLIST HATCHER 3.0
+    Browser-based MRRS medical readiness hit list generator.
+    All processing happens locally — no data leaves this machine.
+    ============================================================
+
+    EXTERNAL LIBRARIES (loaded from CDN, no installation needed):
+    - SheetJS (xlsx): Parses MRRS .xlsx files in the browser
+  -->
+
+  <!-- SheetJS: parses Excel files client-side -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+
+  <!-- App styles -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ============================================================
+       APP HEADER
+  ============================================================ -->
+  <header class="app-header">
+    <div class="app-header-inner">
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge">3.0</span></h1>
+      <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
+    </div>
+  </header>
+
+  <!-- ============================================================
+       MAIN LAYOUT: two columns — settings left, preview right
+  ============================================================ -->
+  <main class="app-layout">
+
+    <!-- ── LEFT PANEL: Settings ─────────────────────────────── -->
+    <aside class="settings-panel" id="settingsPanel">
+
+      <!-- File Upload Card -->
+      <section class="card" id="uploadCard">
+        <h2 class="card-title">1. Upload MRRS File</h2>
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">&#128196;</div>
+          <p class="upload-prompt">
+            <strong>Drag &amp; drop</strong> your MRRS Excel file here<br />
+            or <label class="upload-link" for="fileInput">click to browse</label>
+          </p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+          <p class="upload-hint">Excel IMR Report (Details) export from MRRS</p>
+        </div>
+        <div class="upload-status" id="uploadStatus"></div>
+      </section>
+
+      <!-- Report Items Card (placeholder — built in Phase 4) -->
+      <section class="card" id="reportItemsCard">
+        <h2 class="card-title">2. Report Items</h2>
+        <p class="card-placeholder">Report item selection will be built in Phase 4.</p>
+      </section>
+
+      <!-- Display Options Card (placeholder) -->
+      <section class="card" id="displayCard">
+        <h2 class="card-title">3. Display Options</h2>
+        <p class="card-placeholder">Display options will be built in Phase 4.</p>
+      </section>
+
+      <!-- Unit Customization Card (placeholder) -->
+      <section class="card" id="unitCard">
+        <h2 class="card-title">4. Unit Customization</h2>
+        <p class="card-placeholder">Unit customization will be built in Phase 4.</p>
+      </section>
+
+      <!-- Generate Button -->
+      <button class="btn-generate" id="generateBtn" disabled>
+        Generate Hit List
+      </button>
+
+      <!-- Column Counter (placeholder) -->
+      <div class="column-counter" id="columnCounter">
+        Estimated columns: <span id="columnCount">--</span>
+      </div>
+
+      <!-- Settings persistence buttons -->
+      <div class="settings-actions">
+        <button class="btn-secondary" id="exportSettingsBtn">Export Settings</button>
+        <label class="btn-secondary" for="importSettingsInput">Import Settings</label>
+        <input type="file" id="importSettingsInput" accept=".json" hidden />
+      </div>
+
+    </aside>
+
+    <!-- ── RIGHT PANEL: Preview ──────────────────────────────── -->
+    <section class="preview-panel" id="previewPanel">
+      <div class="preview-placeholder" id="previewPlaceholder">
+        <div class="preview-placeholder-icon">&#128203;</div>
+        <p>Your hit list will appear here after uploading an MRRS file and clicking <strong>Generate Hit List</strong>.</p>
+      </div>
+
+      <!-- The rendered hit list is injected here by app.js -->
+      <div class="report-output" id="reportOutput"></div>
+    </section>
+
+  </main>
+
+  <!-- ============================================================
+       PRINT-ONLY AREA
+       Populated by app.js before window.print() is called.
+       Hidden on screen; visible only in print/PDF output.
+  ============================================================ -->
+  <div class="print-only" id="printOutput"></div>
+
+  <!-- Export PDF button (shown only when a report exists) -->
+  <div class="export-bar" id="exportBar" hidden>
+    <span class="export-hint">In the print dialog, set Destination to &#8220;Save as PDF&#8221;</span>
+    <button class="btn-export" id="exportPdfBtn">&#128438; Export PDF</button>
+  </div>
+
+  <!-- App logic -->
+  <script src="app.js"></script>
+
+</body>
+</html>
