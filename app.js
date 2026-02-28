@@ -474,7 +474,14 @@ function parseMRRS(workbook) {
     }
 
     const offEnl = String(getCell(row, 'OFF_ENL')).trim();
-    const isOfficer = offEnl.toLowerCase().includes('officer');
+    const rank   = String(getCell(row, 'RANK')).trim();
+
+    // Chief Warrant Officers may have a blank Off Enl Indicator in some
+    // MRRS exports. If the indicator is blank, fall back to checking
+    // whether Rank/Rate contains "CWO". CWOs are treated as officers:
+    // they appear in Combined and Officer-only reports, not Enlisted-only.
+    const isOfficer = offEnl.toLowerCase().includes('officer') ||
+                  (offEnl === '' && rank.toUpperCase().includes('CWO'));
 
     if (isOfficer) officers++; else enlisted++;
 
@@ -584,14 +591,14 @@ function logParseResults(parsed) {
     }))
   );
 
-  console.log(`%cFirst 5 personnel (core readiness due dates)`, 'font-weight:bold;');
+  console.log(`%cFirst 5 personnel (core readiness due dates — full dates for verification)`, 'font-weight:bold;');
   console.table(
     personnel.slice(0, 5).map(p => ({
       name:      p.name,
-      phaDue:    p.phaDue    ? formatDate(p.phaDue)    : 'null',
-      dentalDue: p.dentalDue ? formatDate(p.dentalDue) : 'null',
-      hivDue:    p.hivDue    ? formatDate(p.hivDue)    : 'null',
-      audioDue:  p.audioDue  ? formatDate(p.audioDue)  : 'null',
+      phaDue:    p.phaDue    ? formatDateFull(p.phaDue)    : 'null',
+      dentalDue: p.dentalDue ? formatDateFull(p.dentalDue) : 'null',
+      hivDue:    p.hivDue    ? formatDateFull(p.hivDue)    : 'null',
+      audioDue:  p.audioDue  ? formatDateFull(p.audioDue)  : 'null',
     }))
   );
 
@@ -718,6 +725,14 @@ function formatDate(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return '';
   const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   return `${date.getDate()} ${months[date.getMonth()]}`;
+}
+
+// Full date format for console verification and diagnostics only.
+// The hit list display uses formatDate() (no year) for column width efficiency.
+function formatDateFull(date) {
+  if (!date || !(date instanceof Date) || isNaN(date)) return '';
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
 function daysDiff(dateA, dateB) {
