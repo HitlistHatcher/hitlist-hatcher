@@ -5,7 +5,7 @@
    Phase build status:
    [✓] Phase 0  — Scaffold, file upload wiring, drag-and-drop
    [✓] Phase 1  — MRRS data parser
-   [ ] Phase 2  — Core readiness logic
+   [✓] Phase 2  — Core readiness logic
    [ ] Phase 3  — Report renderer
    [ ] Phase 4  — Settings panel
    [ ] Phase 5  — Settings persistence (localStorage + JSON)
@@ -20,7 +20,7 @@
    4.  Initialization
    5.  File Upload Handling
    6.  MRRS Parser          [✓ Phase 1]
-   7.  Readiness Logic      ← built in Phase 2
+   7.  Readiness Logic      [✓ Phase 2]
    8.  Report Renderer      ← built in Phase 3
    9.  Settings Panel       ← built in Phase 4
    10. Settings Persistence ← built in Phase 5
@@ -33,13 +33,10 @@
 
 const APP_VERSION = '3.0.0';
 
-// MRRS file structure
-const MRRS_HEADER_ROW  = 2;   // 0-based: row index 2 = spreadsheet row 3
-const MRRS_DATA_START  = 3;   // 0-based: row index 3 = spreadsheet row 4
-const MRRS_SHEET_NAME  = 'IMR Detail';
+const MRRS_HEADER_ROW = 2;
+const MRRS_DATA_START = 3;
+const MRRS_SHEET_NAME = 'IMR Detail';
 
-// Exact column header strings as they appear in the MRRS export.
-// If MRRS ever adds/renames a column, only this object needs updating.
 const COL = {
   NAME:             'Name',
   RANK:             'Rank/Rate',
@@ -50,7 +47,6 @@ const COL = {
   IMR_STATUS:       'IMR Status',
   DEPLOYING:        'Deploying',
 
-  // Core readiness
   PHA_DT:           'PHA Dt',
   PHA_DUE:          'PHA Due',
   DENTAL_DT:        'Dental Exam Dt',
@@ -61,19 +57,15 @@ const COL = {
   AUDIO_DT:         'Audio 2216 Dt',
   AUDIO_DUE:        'Audio 2216 Due',
 
-  // Deployment health
   PDHA_DUE:         'PDHA Due',
   PDHRA_DUE:        'PDHRA Due',
 
-  // TB / TST
   TST_DUE:          'TST Due Dt',
   TST_QUEST_DUE:    'TST Quest Due',
 
-  // Women's health (displayed as "Well-Woman" for privacy)
   MAMMOGRAM_DUE:    'Mammogram Due',
   PAP_DUE:          'Pap Smear Due',
 
-  // Immunizations — triplets of (Req, Due, Deferred)
   INFLUENZA_REQ:    'Influenza Req',
   INFLUENZA_DUE:    'Influenza Due',
   INFLUENZA_DEF:    'Influenza Deferred',
@@ -152,34 +144,104 @@ const COL = {
   HPV_DEF:          'HPV Deferred',
 };
 
-// Status codes returned by the readiness evaluator (Phase 2)
+// Status codes — order matters for severity comparison (index = severity)
 const STATUS = {
-  OVERDUE:  'OVERDUE',   // red
-  DUE_SOON: 'DUE_SOON', // yellow
-  UPCOMING: 'UPCOMING', // green
-  OK:       'OK',        // not due within any warning window
-  NA:       'NA',        // not applicable / not required
+  NA:       'NA',       // not applicable / not required
+  OK:       'OK',       // not due within any warning window
+  UPCOMING: 'UPCOMING', // green — due within green window
+  DUE_SOON: 'DUE_SOON', // yellow — due within yellow window
+  OVERDUE:  'OVERDUE',  // red — overdue or Class 3/4 dental
 };
 
-// localStorage key
-const STORAGE_KEY = 'hitlistHatcher_settings_v3';
+// Severity rank — higher number = more urgent.
+// Used to find the worst status across multiple items.
+const SEVERITY = {
+  NA:       0,
+  OK:       1,
+  UPCOMING: 2,
+  DUE_SOON: 3,
+  OVERDUE:  4,
+};
 
-// Column counter warning thresholds
-const COL_WARN_YELLOW = 12;
-const COL_WARN_RED    = 14;
+// Default warning thresholds (days). All user-configurable in Phase 4.
+const DEFAULT_THRESHOLDS = {
+  yellow: 7,   // due within 7 days → yellow
+  green:  30,  // due within 30 days → green
+  // red = anything at or past 0 days (today or overdue)
+};
 
-// Debounce delay for text inputs (ms)
-const DEBOUNCE_MS = 500;
+const STORAGE_KEY      = 'hitlistHatcher_settings_v3';
+const COL_WARN_YELLOW  = 12;
+const COL_WARN_RED     = 14;
+const DEBOUNCE_MS      = 500;
+
+// All immunization keys — used by the evaluator and renderer.
+// Order here controls display order in individual-column mode.
+const IMMUNIZATION_KEYS = [
+  'influenza', 'tdap', 'typhoid', 'varicella', 'mmr',
+  'hepa', 'hepb', 'twinrix', 'rabies', 'rabiesTiter',
+  'cholera', 'jev', 'mgc', 'polio', 'yellowFever',
+  'anthrax', 'smallpox', 'adenovirus', 'pneumo', 'hpv',
+];
+
+// Default checked state for immunizations in the settings panel (Phase 4)
+const IMMUNIZATION_DEFAULTS = {
+  influenza:   true,
+  tdap:        true,
+  typhoid:     false,
+  varicella:   false,
+  mmr:         false,
+  hepa:        false,
+  hepb:        false,
+  twinrix:     false,
+  rabies:      false,
+  rabiesTiter: false,
+  cholera:     false,
+  jev:         false,
+  mgc:         false,
+  polio:       false,
+  yellowFever: false,
+  anthrax:     false,
+  smallpox:    false,
+  adenovirus:  false,
+  pneumo:      false,
+  hpv:         false,
+};
+
+// Human-readable labels for each immunization key
+const IMMUNIZATION_LABELS = {
+  influenza:   'Influenza',
+  tdap:        'TDap',
+  typhoid:     'Typhoid',
+  varicella:   'Varicella',
+  mmr:         'MMR',
+  hepa:        'Hep A',
+  hepb:        'Hep B',
+  twinrix:     'TwinRix',
+  rabies:      'Rabies',
+  rabiesTiter: 'Rabies Titer',
+  cholera:     'Cholera',
+  jev:         'JEV',
+  mgc:         'MGC',
+  polio:       'Polio',
+  yellowFever: 'Yellow Fever',
+  anthrax:     'Anthrax',
+  smallpox:    'Smallpox',
+  adenovirus:  'Adenovirus',
+  pneumo:      'Pneumococcal',
+  hpv:         'HPV',
+};
 
 
 /* ── 2. STATE ──────────────────────────────────────────────── */
 
 const state = {
-  rawData:         null,   // SheetJS workbook object
-  personnel:       [],     // Parsed personnel array (populated by parseMRRS)
-  colIndex:        {},     // Maps column header string → array index (built by parseMRRS)
-  parseStats:      {},     // Summary statistics from the last parse
-  settings:        {},     // Current user settings (Phase 4/5)
+  rawData:         null,
+  personnel:       [],
+  colIndex:        {},
+  parseStats:      {},
+  filteredResults: [],   // Output of applyFilters() — what the renderer displays
+  settings:        {},
   reportGenerated: false,
 };
 
@@ -256,8 +318,6 @@ function handleFile(file) {
   reader.onload = (e) => {
     try {
       const data     = new Uint8Array(e.target.result);
-      // cellDates:true  → SheetJS returns JS Date objects for date cells
-      // raw:false       → Formatted string values for non-date cells
       const workbook = XLSX.read(data, { type: 'array', cellDates: true, raw: false });
 
       if (!workbook.SheetNames.includes(MRRS_SHEET_NAME)) {
@@ -269,7 +329,6 @@ function handleFile(file) {
 
       state.rawData = workbook;
 
-      // ── PHASE 1: Parse immediately on load ──────────────────
       const parsed = parseMRRS(workbook);
 
       if (parsed.personnel.length === 0) {
@@ -290,8 +349,6 @@ function handleFile(file) {
       );
 
       dom.generateBtn.disabled = false;
-
-      // Log parse results to console for verification
       logParseResults(parsed);
 
     } catch (err) {
@@ -306,104 +363,57 @@ function handleFile(file) {
 }
 
 function setUploadStatus(type, message) {
-  dom.uploadStatus.textContent  = message;
-  dom.uploadStatus.className    = 'upload-status' + (type ? ` ${type}` : '');
+  dom.uploadStatus.textContent = message;
+  dom.uploadStatus.className   = 'upload-status' + (type ? ` ${type}` : '');
 }
 
 
 /* ── 6. MRRS PARSER ────────────────────────────────────────── */
-/*
-   parseMRRS(workbook)
-   ───────────────────
-   Reads the 'IMR Detail' sheet from a SheetJS workbook object.
-   Returns { personnel[], colIndex{}, stats{} }.
-
-   personnel[] — one object per row, with properties named after
-                 the COL constant keys (e.g. person.NAME, person.PHA_DUE)
-   colIndex{}  — maps each header string to its column array index
-                 (kept in state for diagnostics and future flexibility)
-   stats{}     — summary counts for the upload status message
-*/
 
 function parseMRRS(workbook) {
   const sheet = workbook.Sheets[MRRS_SHEET_NAME];
-
-  // Convert the sheet to a 2D array.
-  // header:1 means SheetJS uses the first row as keys — we do NOT want that
-  // because our header is row 3, not row 1.
-  // So we use sheet_to_json with header:1 to get a raw 2D array, then
-  // manually handle the header row ourselves.
-  const rows = XLSX.utils.sheet_to_json(sheet, {
-    header: 1,          // Return array of arrays (not objects)
-    defval: '',         // Empty cells become empty string, not undefined
-    raw: false,         // Use formatted values for strings
+  const rows  = XLSX.utils.sheet_to_json(sheet, {
+    header: 1,
+    defval: '',
+    raw:    false,
   });
 
-  // ── 6a. Build the column index map ─────────────────────────
-  // Row index 2 (spreadsheet row 3) is the header row.
+  // Build column index map from header row
   const headerRow = rows[MRRS_HEADER_ROW] || [];
   const colIndex  = {};
-
-  headerRow.forEach((headerVal, i) => {
-    if (headerVal !== null && headerVal !== undefined && headerVal !== '') {
-      colIndex[String(headerVal).trim()] = i;
+  headerRow.forEach((val, i) => {
+    if (val !== null && val !== undefined && val !== '') {
+      colIndex[String(val).trim()] = i;
     }
   });
 
-  // Warn in console if any expected columns are missing
-  const missingCols = [];
-  Object.values(COL).forEach(colName => {
-    if (!(colName in colIndex)) missingCols.push(colName);
-  });
+  // Warn about missing columns
+  const missingCols = Object.values(COL).filter(c => !(c in colIndex));
   if (missingCols.length > 0) {
-    console.warn(`parseMRRS: ${missingCols.length} expected column(s) not found in this file:`, missingCols);
+    console.warn(`parseMRRS: ${missingCols.length} expected column(s) not found:`, missingCols);
   }
 
-  // ── 6b. Helper: get a cell value by COL key ─────────────────
-  // Returns the raw value (string, Date, number, or '') for a
-  // given COL constant key and row array.
   function getCell(row, colKey) {
     const idx = colIndex[COL[colKey]];
     if (idx === undefined) return '';
     const val = row[idx];
-    return val === null || val === undefined ? '' : val;
+    return (val === null || val === undefined) ? '' : val;
   }
 
-  // ── 6c. Helper: parse a date cell ───────────────────────────
-  // SheetJS with cellDates:true returns JS Date objects for date
-  // cells when it can detect them. However, some date cells arrive
-  // as formatted strings (e.g. "10/30/2018") or Excel serial numbers.
-  // This function normalises all three cases to a JS Date or null.
   function parseDate(val) {
     if (!val || val === '') return null;
-
-    // Already a Date object (SheetJS cellDates:true)
-    if (val instanceof Date) {
-      return isNaN(val.getTime()) ? null : val;
-    }
-
-    // Numeric — Excel serial date (days since 1900-01-00)
+    if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
     if (typeof val === 'number') {
-      // SheetJS helper converts serial to Date
       const d = XLSX.SSF.parse_date_code(val);
-      if (d) return new Date(d.y, d.m - 1, d.d);
-      return null;
+      return d ? new Date(d.y, d.m - 1, d.d) : null;
     }
-
-    // String — attempt to parse common formats
     if (typeof val === 'string') {
       const trimmed = val.trim();
-      if (trimmed === '') return null;
-
-      // ISO format: "2018-10-30T00:00:00.000Z" or "2018-10-30"
+      if (!trimmed) return null;
       const iso = Date.parse(trimmed);
       if (!isNaN(iso)) return new Date(iso);
-
-      // MM/DD/YYYY
       const mdy = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
       if (mdy) return new Date(parseInt(mdy[3]), parseInt(mdy[1]) - 1, parseInt(mdy[2]));
-
-      // DD-MON-YYYY (e.g. "30-OCT-2018")
       const dmy = trimmed.match(/^(\d{1,2})-([A-Z]{3})-(\d{4})$/i);
       if (dmy) {
         const months = { JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11 };
@@ -411,180 +421,125 @@ function parseMRRS(workbook) {
         if (m !== undefined) return new Date(parseInt(dmy[3]), m, parseInt(dmy[1]));
       }
     }
-
     return null;
   }
 
-  // ── 6d. Helper: dental due date calculation ─────────────────
-  // Two methods per confirmed project decision:
-  //   MRRS method  — use the MRRS-supplied Dental Exam Due date
-  //   12-Month     — add 365 days to the Dental Exam Dt date
-  // The settings toggle (Phase 4) will set useMrrsDate.
-  // For now we default to 12-Month (365-day) as per the project plan.
   function dentalDueDate(row, useMrrsDate = false) {
-    if (useMrrsDate) {
-      return parseDate(getCell(row, 'DENTAL_DUE'));
-    } else {
-      const examDt = parseDate(getCell(row, 'DENTAL_DT'));
-      if (!examDt) return null;
-      const due = new Date(examDt);
-      due.setDate(due.getDate() + 365);
-      return due;
-    }
+    if (useMrrsDate) return parseDate(getCell(row, 'DENTAL_DUE'));
+    const examDt = parseDate(getCell(row, 'DENTAL_DT'));
+    if (!examDt) return null;
+    const due = new Date(examDt);
+    due.setDate(due.getDate() + 365);
+    return due;
   }
 
-  // ── 6d-ii. Helper: parse dental condition class ─────────────
-  // Returns the integer class (1, 2, 3, or 4).
-  // A blank or unrecognised value is treated as Class 4
-  // (no exam on record) per confirmed project decision.
   function parseDentalClass(val) {
     if (!val || String(val).trim() === '') return 4;
     const n = parseInt(String(val).trim(), 10);
-    if (n === 1 || n === 2 || n === 3 || n === 4) return n;
-    return 4; // Unrecognised value → treat as unclassified
+    return (n >= 1 && n <= 4) ? n : 4;
   }
-   
-  // ── 6e. Helper: normalise boolean-ish string fields ─────────
-  // MRRS uses values like "Yes", "No", "Y", "N", blank, etc.
-  // Returns true if the value suggests "required" or "yes".
+
   function isYes(val) {
     if (!val && val !== 0) return false;
     const s = String(val).trim().toLowerCase();
     return s === 'yes' || s === 'y' || s === '1' || s === 'true';
   }
 
-  // Returns true if the value suggests "deferred".
   function isDeferred(val) {
     if (!val && val !== 0) return false;
     const s = String(val).trim().toLowerCase();
     return s === 'yes' || s === 'y' || s === '1' || s === 'true' || s === 'deferred';
   }
 
-  // ── 6f. Helper: section label ────────────────────────────────
-  // Combines Comp/Dept and Platoon into a single readable label.
   function sectionLabel(row) {
-    const dept     = String(getCell(row, 'COMP_DEPT')).trim();
-    const platoon  = String(getCell(row, 'PLATOON')).trim();
+    const dept    = String(getCell(row, 'COMP_DEPT')).trim();
+    const platoon = String(getCell(row, 'PLATOON')).trim();
     if (dept && platoon) return `${dept}-${platoon}`;
     return dept || platoon || '';
   }
 
-  // ── 6g. Parse all data rows ──────────────────────────────────
   const personnel = [];
-  let officers = 0;
-  let enlisted = 0;
-  let skipped  = 0;
+  let officers = 0, enlisted = 0, skipped = 0;
 
   for (let i = MRRS_DATA_START; i < rows.length; i++) {
-    const row = rows[i];
-
-    // Skip completely empty rows (can appear at end of sheet)
+    const row  = rows[i];
     const name = String(getCell(row, 'NAME')).trim();
-    if (!name || name === '') {
-      skipped++;
-      continue;
-    }
+    if (!name) { skipped++; continue; }
 
-    const offEnl = String(getCell(row, 'OFF_ENL')).trim();
-    const rank   = String(getCell(row, 'RANK')).trim();
-
-    // Chief Warrant Officers may have a blank Off Enl Indicator in some
-    // MRRS exports. If the indicator is blank, fall back to checking
-    // whether Rank/Rate contains "CWO". CWOs are treated as officers:
-    // they appear in Combined and Officer-only reports, not Enlisted-only.
+    const offEnl    = String(getCell(row, 'OFF_ENL')).trim();
+    const rank      = String(getCell(row, 'RANK')).trim();
     const isOfficer = offEnl.toLowerCase().includes('officer') ||
-                  (offEnl === '' && rank.toUpperCase().includes('CWO'));
+                      (offEnl === '' && rank.toUpperCase().includes('CWO'));
 
     if (isOfficer) officers++; else enlisted++;
 
-    // Build the personnel object.
-    // All date fields are normalised to JS Date objects or null.
-    // All string fields are trimmed.
     const person = {
-      // Identity
-      name:        name,
-      rank:        String(getCell(row, 'RANK')).trim(),
+      name,
+      rank,
       section:     sectionLabel(row),
       offEnl:      isOfficer ? 'Officer' : 'Enlisted',
       sex:         String(getCell(row, 'SEX')).trim(),
       imrStatus:   String(getCell(row, 'IMR_STATUS')).trim(),
       deploying:   isYes(getCell(row, 'DEPLOYING')),
 
-      // Core readiness — due dates
       phaDue:      parseDate(getCell(row, 'PHA_DUE')),
-      dentalDue:   dentalDueDate(row, false),   // false = 12-month method
+      dentalDue:   dentalDueDate(row, false),
       dentalClass: parseDentalClass(getCell(row, 'DENTAL_CLASS')),
       hivDue:      parseDate(getCell(row, 'HIV_DUE')),
       audioDue:    parseDate(getCell(row, 'AUDIO_DUE')),
 
-      // Deployment
       pdhaDue:     parseDate(getCell(row, 'PDHA_DUE')),
       pdhraDue:    parseDate(getCell(row, 'PDHRA_DUE')),
 
-      // TB / TST
       tstDue:      parseDate(getCell(row, 'TST_DUE')),
       tstQuestDue: parseDate(getCell(row, 'TST_QUEST_DUE')),
 
-      // Women's health
       mammogramDue: parseDate(getCell(row, 'MAMMOGRAM_DUE')),
-      papDue:        parseDate(getCell(row, 'PAP_DUE')),
+      papDue:       parseDate(getCell(row, 'PAP_DUE')),
 
-      // Immunizations — each stored as { req, due, deferred }
-      // The readiness evaluator (Phase 2) will use this structure.
       immunizations: {
-        influenza:  { req: isYes(getCell(row,'INFLUENZA_REQ')),  due: parseDate(getCell(row,'INFLUENZA_DUE')),  deferred: isDeferred(getCell(row,'INFLUENZA_DEF')),  label: 'Influenza' },
-        tdap:       { req: isYes(getCell(row,'TDAP_REQ')),       due: parseDate(getCell(row,'TDAP_DUE')),       deferred: isDeferred(getCell(row,'TDAP_DEF')),       label: 'TDap' },
-        typhoid:    { req: isYes(getCell(row,'TYPHOID_REQ')),    due: parseDate(getCell(row,'TYPHOID_DUE')),    deferred: isDeferred(getCell(row,'TYPHOID_DEF')),    label: 'Typhoid' },
-        varicella:  { req: isYes(getCell(row,'VARICELLA_REQ')), due: parseDate(getCell(row,'VARICELLA_DUE')), deferred: isDeferred(getCell(row,'VARICELLA_DEF')), label: 'Varicella' },
-        mmr:        { req: isYes(getCell(row,'MMR_REQ')),        due: parseDate(getCell(row,'MMR_DUE')),        deferred: isDeferred(getCell(row,'MMR_DEF')),        label: 'MMR' },
-        hepa:       { req: isYes(getCell(row,'HEPA_REQ')),       due: parseDate(getCell(row,'HEPA_DUE')),       deferred: isDeferred(getCell(row,'HEPA_DEF')),       label: 'Hep A' },
-        hepb:       { req: isYes(getCell(row,'HEPB_REQ')),       due: parseDate(getCell(row,'HEPB_DUE')),       deferred: isDeferred(getCell(row,'HEPB_DEF')),       label: 'Hep B' },
-        twinrix:    { req: isYes(getCell(row,'TWINRIX_REQ')),    due: parseDate(getCell(row,'TWINRIX_DUE')),    deferred: isDeferred(getCell(row,'TWINRIX_DEF')),    label: 'TwinRix' },
-        rabies:     { req: isYes(getCell(row,'RABIES_REQ')),     due: parseDate(getCell(row,'RABIES_DUE')),     deferred: isDeferred(getCell(row,'RABIES_DEF')),     label: 'Rabies' },
-        rabiesTiter:{ req: isYes(getCell(row,'RABIES_REQ')),     due: parseDate(getCell(row,'RABIES_TITER_DUE')), deferred: false,                                   label: 'Rabies Titer' },
-        cholera:    { req: isYes(getCell(row,'CHOLERA_REQ')),    due: parseDate(getCell(row,'CHOLERA_DUE')),    deferred: isDeferred(getCell(row,'CHOLERA_DEF')),    label: 'Cholera' },
-        jev:        { req: isYes(getCell(row,'JEV_REQ')),        due: parseDate(getCell(row,'JEV_DUE')),        deferred: isDeferred(getCell(row,'JEV_DEF')),        label: 'JEV' },
-        mgc:        { req: isYes(getCell(row,'MGC_REQ')),        due: parseDate(getCell(row,'MGC_DUE')),        deferred: isDeferred(getCell(row,'MGC_DEF')),        label: 'MGC' },
-        polio:      { req: isYes(getCell(row,'POLIO_REQ')),      due: parseDate(getCell(row,'POLIO_DUE')),      deferred: isDeferred(getCell(row,'POLIO_DEF')),      label: 'Polio' },
-        yellowFever:{ req: isYes(getCell(row,'YF_REQ')),         due: parseDate(getCell(row,'YF_DUE')),         deferred: isDeferred(getCell(row,'YF_DEF')),         label: 'Yellow Fever' },
-        anthrax:    { req: isYes(getCell(row,'ANTHRAX_REQ')),    due: parseDate(getCell(row,'ANTHRAX_DUE')),    deferred: isDeferred(getCell(row,'ANTHRAX_DEF')),    label: 'Anthrax' },
-        smallpox:   { req: isYes(getCell(row,'SMALLPOX_REQ')),   due: parseDate(getCell(row,'SMALLPOX_DUE')),   deferred: isDeferred(getCell(row,'SMALLPOX_DEF')),   label: 'Smallpox' },
-        adenovirus: { req: isYes(getCell(row,'ADENOVIRUS_REQ')), due: parseDate(getCell(row,'ADENOVIRUS_DUE')), deferred: isDeferred(getCell(row,'ADENOVIRUS_DEF')), label: 'Adenovirus' },
-        pneumo:     { req: isYes(getCell(row,'PNEUMO_REQ')),     due: parseDate(getCell(row,'PNEUMO_DUE')),     deferred: isDeferred(getCell(row,'PNEUMO_DEF')),     label: 'Pneumococcal' },
-        hpv:        { req: isYes(getCell(row,'HPV_REQ')),        due: parseDate(getCell(row,'HPV_DUE')),        deferred: isDeferred(getCell(row,'HPV_DEF')),        label: 'HPV' },
+        influenza:   { req: isYes(getCell(row,'INFLUENZA_REQ')),  due: parseDate(getCell(row,'INFLUENZA_DUE')),  deferred: isDeferred(getCell(row,'INFLUENZA_DEF')),  label: 'Influenza' },
+        tdap:        { req: isYes(getCell(row,'TDAP_REQ')),       due: parseDate(getCell(row,'TDAP_DUE')),       deferred: isDeferred(getCell(row,'TDAP_DEF')),       label: 'TDap' },
+        typhoid:     { req: isYes(getCell(row,'TYPHOID_REQ')),    due: parseDate(getCell(row,'TYPHOID_DUE')),    deferred: isDeferred(getCell(row,'TYPHOID_DEF')),    label: 'Typhoid' },
+        varicella:   { req: isYes(getCell(row,'VARICELLA_REQ')), due: parseDate(getCell(row,'VARICELLA_DUE')), deferred: isDeferred(getCell(row,'VARICELLA_DEF')), label: 'Varicella' },
+        mmr:         { req: isYes(getCell(row,'MMR_REQ')),        due: parseDate(getCell(row,'MMR_DUE')),        deferred: isDeferred(getCell(row,'MMR_DEF')),        label: 'MMR' },
+        hepa:        { req: isYes(getCell(row,'HEPA_REQ')),       due: parseDate(getCell(row,'HEPA_DUE')),       deferred: isDeferred(getCell(row,'HEPA_DEF')),       label: 'Hep A' },
+        hepb:        { req: isYes(getCell(row,'HEPB_REQ')),       due: parseDate(getCell(row,'HEPB_DUE')),       deferred: isDeferred(getCell(row,'HEPB_DEF')),       label: 'Hep B' },
+        twinrix:     { req: isYes(getCell(row,'TWINRIX_REQ')),    due: parseDate(getCell(row,'TWINRIX_DUE')),    deferred: isDeferred(getCell(row,'TWINRIX_DEF')),    label: 'TwinRix' },
+        rabies:      { req: isYes(getCell(row,'RABIES_REQ')),     due: parseDate(getCell(row,'RABIES_DUE')),     deferred: isDeferred(getCell(row,'RABIES_DEF')),     label: 'Rabies' },
+        rabiesTiter: { req: isYes(getCell(row,'RABIES_REQ')),     due: parseDate(getCell(row,'RABIES_TITER_DUE')), deferred: false,                                   label: 'Rabies Titer' },
+        cholera:     { req: isYes(getCell(row,'CHOLERA_REQ')),    due: parseDate(getCell(row,'CHOLERA_DUE')),    deferred: isDeferred(getCell(row,'CHOLERA_DEF')),    label: 'Cholera' },
+        jev:         { req: isYes(getCell(row,'JEV_REQ')),        due: parseDate(getCell(row,'JEV_DUE')),        deferred: isDeferred(getCell(row,'JEV_DEF')),        label: 'JEV' },
+        mgc:         { req: isYes(getCell(row,'MGC_REQ')),        due: parseDate(getCell(row,'MGC_DUE')),        deferred: isDeferred(getCell(row,'MGC_DEF')),        label: 'MGC' },
+        polio:       { req: isYes(getCell(row,'POLIO_REQ')),      due: parseDate(getCell(row,'POLIO_DUE')),      deferred: isDeferred(getCell(row,'POLIO_DEF')),      label: 'Polio' },
+        yellowFever: { req: isYes(getCell(row,'YF_REQ')),         due: parseDate(getCell(row,'YF_DUE')),         deferred: isDeferred(getCell(row,'YF_DEF')),         label: 'Yellow Fever' },
+        anthrax:     { req: isYes(getCell(row,'ANTHRAX_REQ')),    due: parseDate(getCell(row,'ANTHRAX_DUE')),    deferred: isDeferred(getCell(row,'ANTHRAX_DEF')),    label: 'Anthrax' },
+        smallpox:    { req: isYes(getCell(row,'SMALLPOX_REQ')),   due: parseDate(getCell(row,'SMALLPOX_DUE')),   deferred: isDeferred(getCell(row,'SMALLPOX_DEF')),   label: 'Smallpox' },
+        adenovirus:  { req: isYes(getCell(row,'ADENOVIRUS_REQ')), due: parseDate(getCell(row,'ADENOVIRUS_DUE')), deferred: isDeferred(getCell(row,'ADENOVIRUS_DEF')), label: 'Adenovirus' },
+        pneumo:      { req: isYes(getCell(row,'PNEUMO_REQ')),     due: parseDate(getCell(row,'PNEUMO_DUE')),     deferred: isDeferred(getCell(row,'PNEUMO_DEF')),     label: 'Pneumococcal' },
+        hpv:         { req: isYes(getCell(row,'HPV_REQ')),        due: parseDate(getCell(row,'HPV_DUE')),        deferred: isDeferred(getCell(row,'HPV_DEF')),        label: 'HPV' },
       },
     };
 
     personnel.push(person);
   }
 
-  const stats = {
-    total:    personnel.length,
-    officers,
-    enlisted,
-    skipped,
-    columns:  Object.keys(colIndex).length,
+  return {
+    personnel,
+    colIndex,
+    stats: { total: personnel.length, officers, enlisted, skipped, columns: Object.keys(colIndex).length },
   };
-
-  return { personnel, colIndex, stats };
 }
 
 
 /* ── 6h. CONSOLE VERIFICATION LOGGER ──────────────────────── */
-/*
-   Logs a structured summary to the browser console after parsing
-   so you can verify the data looks correct against your MRRS file.
-   Open DevTools (F12) → Console after uploading a file.
-   This function is safe to leave in — it only runs in the browser
-   and produces no visible UI output.
-*/
 
 function logParseResults(parsed) {
   const { personnel, stats } = parsed;
 
-  console.group(`%cHitlist Hatcher — Parse Results`, 'color:#003087; font-weight:bold; font-size:14px;');
+  console.group('%cHitlist Hatcher — Parse Results', 'color:#003087;font-weight:bold;font-size:14px;');
 
-  console.log(`%cSummary`, 'font-weight:bold;');
+  console.log('%cSummary', 'font-weight:bold;');
   console.table({
     'Total personnel': stats.total,
     'Officers':        stats.officers,
@@ -593,63 +548,398 @@ function logParseResults(parsed) {
     'Columns found':   stats.columns,
   });
 
-  console.log(`%cFirst 5 personnel (identity fields)`, 'font-weight:bold;');
-  console.table(
-    personnel.slice(0, 5).map(p => ({
-      name:      p.name,
-      rank:      p.rank,
-      section:   p.section,
-      category:  p.offEnl,
-      imrStatus: p.imrStatus,
-    }))
-  );
+  console.log('%cFirst 5 personnel (identity fields)', 'font-weight:bold;');
+  console.table(personnel.slice(0, 5).map(p => ({
+    name: p.name, rank: p.rank, section: p.section,
+    category: p.offEnl, dentalClass: p.dentalClass, imrStatus: p.imrStatus,
+  })));
 
-  console.log(`%cFirst 5 personnel (core readiness due dates — full dates for verification)`, 'font-weight:bold;');
-  console.table(
-    personnel.slice(0, 5).map(p => ({
-      name:      p.name,
-      phaDue:    p.phaDue    ? formatDateFull(p.phaDue)    : 'null',
-      dentalDue: p.dentalDue ? formatDateFull(p.dentalDue) : 'null',
-      hivDue:    p.hivDue    ? formatDateFull(p.hivDue)    : 'null',
-      audioDue:  p.audioDue  ? formatDateFull(p.audioDue)  : 'null',
-    }))
-  );
+  console.log('%cFirst 5 personnel (core readiness due dates — full dates for verification)', 'font-weight:bold;');
+  console.table(personnel.slice(0, 5).map(p => ({
+    name:      p.name,
+    phaDue:    p.phaDue    ? formatDateFull(p.phaDue)    : 'null',
+    dentalDue: p.dentalDue ? formatDateFull(p.dentalDue) : 'null',
+    hivDue:    p.hivDue    ? formatDateFull(p.hivDue)    : 'null',
+    audioDue:  p.audioDue  ? formatDateFull(p.audioDue)  : 'null',
+  })));
 
-  console.log(`%cFirst 5 personnel (immunization sample — Influenza & TDap)`, 'font-weight:bold;');
-  console.table(
-    personnel.slice(0, 5).map(p => ({
-      name:           p.name,
-      influenza_req:  p.immunizations.influenza.req,
-      influenza_due:  p.immunizations.influenza.due ? formatDate(p.immunizations.influenza.due) : 'null',
-      influenza_def:  p.immunizations.influenza.deferred,
-      tdap_req:       p.immunizations.tdap.req,
-      tdap_due:       p.immunizations.tdap.due ? formatDate(p.immunizations.tdap.due) : 'null',
-    }))
-  );
+  console.log('%cFirst 5 personnel (Influenza & TDap immunizations)', 'font-weight:bold;');
+  console.table(personnel.slice(0, 5).map(p => ({
+    name:          p.name,
+    influenza_req: p.immunizations.influenza.req,
+    influenza_due: p.immunizations.influenza.due ? formatDateFull(p.immunizations.influenza.due) : 'null',
+    influenza_def: p.immunizations.influenza.deferred,
+    tdap_req:      p.immunizations.tdap.req,
+    tdap_due:      p.immunizations.tdap.due ? formatDateFull(p.immunizations.tdap.due) : 'null',
+  })));
 
-  console.log(
-    `%cFull personnel array available as: window._hhPersonnel`,
-    'color:#1e8449; font-style:italic;'
-  );
-  window._hhPersonnel = personnel; // Available in console for ad-hoc inspection
+  console.log('%cFull array: window._hhPersonnel', 'color:#1e8449;font-style:italic;');
+  window._hhPersonnel = personnel;
 
   console.groupEnd();
 }
 
 
 /* ── 7. READINESS LOGIC ────────────────────────────────────── */
-/*  Built in Phase 2  */
 
+/*
+  7a. evaluateItem(dueDate, projectionDate, thresholds)
+  ─────────────────────────────────────────────────────
+  The core comparator. Takes a due date (JS Date or null), a projection
+  date (JS Date), and a thresholds object { yellow, green } (days).
+  Returns a STATUS constant.
+
+  Logic:
+    - null due date                          → NA
+    - daysUntilDue <= 0  (today or past)     → OVERDUE (red)
+    - daysUntilDue <= thresholds.yellow      → DUE_SOON (yellow)
+    - daysUntilDue <= thresholds.green       → UPCOMING (green)
+    - daysUntilDue >  thresholds.green       → OK (not shown unless other items due)
+
+  Note: daysDiff(dueDate, projectionDate) is positive when the due date
+  is in the future and negative when it is in the past.
+*/
 function evaluateItem(dueDate, projectionDate, thresholds) {
-  console.log('evaluateItem() — Phase 2 not yet built.');
-  return STATUS.NA;
+  if (!dueDate || !(dueDate instanceof Date) || isNaN(dueDate)) return STATUS.NA;
+
+  const days = daysDiff(dueDate, projectionDate);
+
+  if (days <= 0)                   return STATUS.OVERDUE;
+  if (days <= thresholds.yellow)   return STATUS.DUE_SOON;
+  if (days <= thresholds.green)    return STATUS.UPCOMING;
+  return STATUS.OK;
+}
+
+
+/*
+  7b. evaluateDental(person, projectionDate, thresholds, useMrrsDate)
+  ────────────────────────────────────────────────────────────────────
+  Dedicated dental evaluator. Handles Class 3/4 override logic.
+
+  Returns { status, displayText }
+    - displayText is what appears in the cell.
+    - For Class 3/4: displayText is "Class 3" or "Class 4", status is OVERDUE.
+    - For Class 1/2: displayText is the formatted due date (set by renderer),
+      status is from evaluateItem().
+
+  useMrrsDate: if true, uses the MRRS-supplied due date directly.
+               if false (default), uses the 365-day date already stored
+               in person.dentalDue by the parser.
+*/
+function evaluateDental(person, projectionDate, thresholds, useMrrsDate = false) {
+  const cls = person.dentalClass;
+
+  if (cls === 3) return { status: STATUS.OVERDUE, displayText: 'Class 3' };
+  if (cls === 4) return { status: STATUS.OVERDUE, displayText: 'Class 4' };
+
+  // Class 1 or 2: evaluate by due date
+  // The 365-day adjusted date is already stored in person.dentalDue by the parser.
+  // If useMrrsDate is true the renderer will need the raw MRRS date —
+  // but since we store only the 365-day date in the person object, the
+  // settings toggle in Phase 4 will call parseMRRS with the correct flag.
+  // For now person.dentalDue is always the 365-day date.
+  const status = evaluateItem(person.dentalDue, projectionDate, thresholds);
+  return { status, displayText: null }; // null = renderer shows the formatted date
+}
+
+
+/*
+  7c. evaluateImmunization(immObj, projectionDate, thresholds)
+  ─────────────────────────────────────────────────────────────
+  Evaluates a single immunization object { req, due, deferred, label }.
+  Returns STATUS.
+
+  Logic:
+    - not required (req === false)   → NA
+    - deferred                       → NA (deferred = not currently actionable)
+    - due date null                  → OVERDUE (required but no date on record)
+    - otherwise                      → evaluateItem()
+*/
+function evaluateImmunization(immObj, projectionDate, thresholds) {
+  if (!immObj.req)      return STATUS.NA;
+  if (immObj.deferred)  return STATUS.NA;
+  if (!immObj.due)      return STATUS.OVERDUE; // required but no date — flag it
+  return evaluateItem(immObj.due, projectionDate, thresholds);
+}
+
+
+/*
+  7d. evaluateImmunizations(person, selectedKeys, projectionDate, thresholds)
+  ─────────────────────────────────────────────────────────────────────────────
+  Aggregates immunization status across all selected vaccines for one person.
+  Used by both grouped mode (returns summary) and individual mode (returns
+  per-vaccine statuses).
+
+  selectedKeys: array of immunization key strings that are checked in settings
+                (e.g. ['influenza', 'tdap'])
+
+  Returns {
+    worstStatus,          // highest-severity STATUS across all selected vaccines
+    count,                // number of selected vaccines that are OVERDUE or DUE_SOON or UPCOMING
+    dueNames,             // array of label strings for vaccines that are not NA/OK (for tooltip)
+    perVaccine,           // object keyed by vaccine key → { status, due } for individual mode
+  }
+*/
+function evaluateImmunizations(person, selectedKeys, projectionDate, thresholds) {
+  let worstStatus = STATUS.NA;
+  let count       = 0;
+  const dueNames  = [];
+  const perVaccine = {};
+
+  selectedKeys.forEach(key => {
+    const immObj = person.immunizations[key];
+    if (!immObj) return;
+
+    const status = evaluateImmunization(immObj, projectionDate, thresholds);
+    perVaccine[key] = { status, due: immObj.due };
+
+    if (SEVERITY[status] > SEVERITY[worstStatus]) worstStatus = status;
+
+    if (status === STATUS.OVERDUE || status === STATUS.DUE_SOON || status === STATUS.UPCOMING) {
+      count++;
+      dueNames.push(immObj.label);
+    }
+  });
+
+  return { worstStatus, count, dueNames, perVaccine };
+}
+
+
+/*
+  7e. evaluatePerson(person, settings, projectionDate)
+  ─────────────────────────────────────────────────────
+  Runs the full readiness evaluation for one person against the
+  current settings configuration. Returns a result object that the
+  renderer (Phase 3) consumes directly.
+
+  settings (placeholder values used until Phase 4 builds the UI):
+  {
+    items: {
+      pha, dental, hiv, audio, pdha, pdhra, tst, tstQuest,
+      wellWoman, immunizations
+    },
+    immunizationKeys: [],     // which vaccines are selected
+    thresholds: { yellow, green },
+    dentalUseMrrsDate: false,
+  }
+
+  Returns {
+    person,                   // reference to the original person object
+    overallStatus,            // worst status across all evaluated items
+    items: {
+      pha:         { status, displayText },
+      dental:      { status, displayText },
+      hiv:         { status, displayText },
+      audio:       { status, displayText },
+      pdha:        { status, displayText },
+      pdhra:       { status, displayText },
+      tst:         { status, displayText },
+      tstQuest:    { status, displayText },
+      wellWoman:   { status, displayText },
+      immunizations: {
+        grouped:   { status, count, dueNames },   // for grouped display mode
+        perVaccine: { [key]: { status, due } },   // for individual column mode
+      }
+    },
+    isDue,   // boolean — true if this person should appear on the hit list
+  }
+*/
+function evaluatePerson(person, settings, projectionDate) {
+  const t = settings.thresholds || DEFAULT_THRESHOLDS;
+
+  // ── Evaluate each selected item ────────────────────────────
+
+  // PHA
+  const phaResult = settings.items.pha
+    ? { status: evaluateItem(person.phaDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // Dental (has its own evaluator due to Class 3/4 logic)
+  const dentalResult = settings.items.dental
+    ? evaluateDental(person, projectionDate, t, settings.dentalUseMrrsDate || false)
+    : { status: STATUS.NA, displayText: null };
+
+  // HIV
+  const hivResult = settings.items.hiv
+    ? { status: evaluateItem(person.hivDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // Audiogram
+  const audioResult = settings.items.audio
+    ? { status: evaluateItem(person.audioDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // PDHA
+  const pdhaResult = settings.items.pdha
+    ? { status: evaluateItem(person.pdhaDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // PDHRA
+  const pdhraResult = settings.items.pdhra
+    ? { status: evaluateItem(person.pdhraDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // TST
+  const tstResult = settings.items.tst
+    ? { status: evaluateItem(person.tstDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // TST Quest
+  const tstQuestResult = settings.items.tstQuest
+    ? { status: evaluateItem(person.tstQuestDue, projectionDate, t), displayText: null }
+    : { status: STATUS.NA, displayText: null };
+
+  // Well-Woman (Mammogram + Pap Smear — worst of the two, women only)
+  let wellWomanResult = { status: STATUS.NA, displayText: null };
+  if (settings.items.wellWoman && person.sex.toLowerCase() === 'female') {
+    const mamStatus = evaluateItem(person.mammogramDue, projectionDate, t);
+    const papStatus = evaluateItem(person.papDue, projectionDate, t);
+    const worst = SEVERITY[mamStatus] >= SEVERITY[papStatus] ? mamStatus : papStatus;
+    wellWomanResult = { status: worst, displayText: null };
+  }
+
+  // Immunizations
+  const immKeys   = settings.immunizationKeys || [];
+  const immResult = evaluateImmunizations(person, immKeys, projectionDate, t);
+
+  const immunizationsResult = {
+    grouped:    { status: immResult.worstStatus, count: immResult.count, dueNames: immResult.dueNames },
+    perVaccine: immResult.perVaccine,
+  };
+
+  // ── Determine overall (worst) status ───────────────────────
+  const allStatuses = [
+    phaResult.status,
+    dentalResult.status,
+    hivResult.status,
+    audioResult.status,
+    pdhaResult.status,
+    pdhraResult.status,
+    tstResult.status,
+    tstQuestResult.status,
+    wellWomanResult.status,
+    immResult.worstStatus,
+  ];
+
+  const overallStatus = allStatuses.reduce((worst, s) =>
+    SEVERITY[s] > SEVERITY[worst] ? s : worst,
+    STATUS.NA
+  );
+
+  // Person appears on the hit list if any item is OVERDUE, DUE_SOON, or UPCOMING
+  const isDue = SEVERITY[overallStatus] >= SEVERITY[STATUS.UPCOMING];
+
+  return {
+    person,
+    overallStatus,
+    items: {
+      pha:           phaResult,
+      dental:        dentalResult,
+      hiv:           hivResult,
+      audio:         audioResult,
+      pdha:          pdhaResult,
+      pdhra:         pdhraResult,
+      tst:           tstResult,
+      tstQuest:      tstQuestResult,
+      wellWoman:     wellWomanResult,
+      immunizations: immunizationsResult,
+    },
+    isDue,
+  };
+}
+
+
+/*
+  7f. applyFilters(personnel, settings, projectionDate)
+  ──────────────────────────────────────────────────────
+  1. Evaluates every person via evaluatePerson().
+  2. Filters to only those where isDue === true.
+  3. Applies officer/enlisted filter.
+  4. Sorts by name or by section-then-name.
+  Returns { results[], stats{} } where results[] is the array the
+  renderer will iterate over, and stats{} feeds the readiness summary.
+*/
+function applyFilters(personnel, settings, projectionDate) {
+  // Evaluate everyone (stats need the full roster, not just the filtered list)
+  const allEvaluated = personnel.map(p => evaluatePerson(p, settings, projectionDate));
+
+  // Compute summary stats from full roster IMR status field
+  const stats = computeReadinessStats(personnel);
+
+  // Filter by officer/enlisted preference
+  const offEnlFilter = settings.offEnlFilter || 'combined';
+  let filtered = allEvaluated.filter(r => {
+    if (!r.isDue) return false;
+    if (offEnlFilter === 'combined')  return true;
+    if (offEnlFilter === 'officer')   return r.person.offEnl === 'Officer';
+    if (offEnlFilter === 'enlisted')  return r.person.offEnl === 'Enlisted';
+    return true;
+  });
+
+  // Sort
+  const sortBy = settings.sortBy || 'name';
+  filtered.sort((a, b) => {
+    if (sortBy === 'section') {
+      const secCmp = a.person.section.localeCompare(b.person.section);
+      if (secCmp !== 0) return secCmp;
+    }
+    return a.person.name.localeCompare(b.person.name);
+  });
+
+  return { results: filtered, stats };
+}
+
+
+/*
+  7g. computeReadinessStats(personnel)
+  ──────────────────────────────────────
+  Counts IMR status values from the full personnel roster.
+  These numbers feed the readiness summary in the report header.
+
+  MRRS IMR Status values observed in the data:
+    "Fully Medically Ready"
+    "Not Medically Ready"
+    "Partially Medically Ready"
+    "Indeterminate"
+
+  Returns { total, fullyReady, notReady, partial, indeterminate,
+            fullyReadyPct, notReadyPct, partialPct, indeterminatePct }
+*/
+function computeReadinessStats(personnel) {
+  let fullyReady    = 0;
+  let notReady      = 0;
+  let partial       = 0;
+  let indeterminate = 0;
+
+  personnel.forEach(p => {
+    const s = (p.imrStatus || '').toLowerCase();
+    if (s.includes('fully'))          fullyReady++;
+    else if (s.includes('not'))       notReady++;
+    else if (s.includes('partial'))   partial++;
+    else                               indeterminate++;
+  });
+
+  const total = personnel.length;
+  const pct   = n => total > 0 ? ((n / total) * 100).toFixed(1) : '0.0';
+
+  return {
+    total,
+    fullyReady,
+    notReady,
+    partial,
+    indeterminate,
+    fullyReadyPct:    pct(fullyReady),
+    notReadyPct:      pct(notReady),
+    partialPct:       pct(partial),
+    indeterminatePct: pct(indeterminate),
+  };
 }
 
 
 /* ── 8. REPORT RENDERER ────────────────────────────────────── */
 /*  Built in Phase 3  */
 
-function renderReport(personnel, settings) {
+function renderReport(results, stats, settings) {
   console.log('renderReport() — Phase 3 not yet built.');
 }
 
@@ -661,41 +951,114 @@ function initSettingsPanel() {
   console.log('initSettingsPanel() — Phase 4 not yet built.');
 }
 
-// Generate button — will chain Phases 1-3 together
+
+/*
+  Generate button — now chains Phases 1 and 2 together.
+  Uses temporary hardcoded settings until Phase 4 builds the UI.
+  Logs the Phase 2 output to the console for verification.
+*/
 dom.generateBtn.addEventListener('click', () => {
   if (!state.rawData || state.personnel.length === 0) {
     alert('Please upload an MRRS file first.');
     return;
   }
 
-  console.log(`Generate clicked — ${state.personnel.length} personnel in memory. Phases 2-3 will process these once built.`);
+  // ── Temporary settings (replaced by UI in Phase 4) ─────────
+  const tempSettings = {
+    items: {
+      pha:       true,
+      dental:    true,
+      hiv:       true,
+      audio:     true,
+      pdha:      false,
+      pdhra:     false,
+      tst:       false,
+      tstQuest:  false,
+      wellWoman: false,
+      immunizations: true,
+    },
+    immunizationKeys:  ['influenza', 'tdap'],
+    thresholds:        { yellow: 7, green: 30 },
+    offEnlFilter:      'combined',
+    sortBy:            'name',
+    immunDisplayMode:  'grouped',
+    dentalUseMrrsDate: false,
+  };
 
-  // Temporary preview message until Phase 3 is built
+  const projectionDate = new Date(); // today — replaced by date picker in Phase 4
+
+  // Run Phase 2
+  const { results, stats } = applyFilters(state.personnel, tempSettings, projectionDate);
+  state.filteredResults = results;
+
+  // Log Phase 2 output to console for verification
+  logPhase2Results(results, stats, projectionDate);
+
+  // Temporary preview card
   dom.previewPlaceholder.hidden = true;
   dom.reportOutput.innerHTML = `
     <div style="
-      background:#fff;
-      border-radius:6px;
-      padding:40px;
-      text-align:center;
-      box-shadow:0 2px 10px rgba(0,0,0,0.1);
+      background:#fff; border-radius:6px; padding:40px;
+      text-align:center; box-shadow:0 2px 10px rgba(0,0,0,0.1);
     ">
       <div style="font-size:48px; margin-bottom:16px;">✓</div>
       <p style="font-size:18px; font-weight:700; color:#003087; margin-bottom:8px;">
-        Phase 1 Complete — Parser Working
+        Phase 2 Complete — Readiness Logic Working
       </p>
-      <p style="font-size:14px; color:#444; margin-bottom:16px;">
-        ${state.personnel.length} personnel parsed successfully
-        (${state.parseStats.officers} officers,
-         ${state.parseStats.enlisted} enlisted).
+      <p style="font-size:14px; color:#444; margin-bottom:8px;">
+        ${results.length} personnel flagged as due or upcoming
+        out of ${state.personnel.length} total.
+      </p>
+      <p style="font-size:13px; color:#444; margin-bottom:16px;">
+        Force Readiness: ${stats.fullyReadyPct}% Fully Ready &nbsp;|&nbsp;
+        ${stats.notReadyPct}% Not Ready &nbsp;|&nbsp;
+        ${stats.partialPct}% Partial &nbsp;|&nbsp;
+        ${stats.indeterminatePct}% Indeterminate
       </p>
       <p style="font-size:13px; color:#9aa3b0;">
-        Open the browser console (F12 → Console) to inspect the parsed data.<br />
+        Open the browser console (F12 → Console) to inspect evaluation results.<br />
         The report renderer will be built in Phase 3.
       </p>
     </div>
   `;
 });
+
+
+/* ── Phase 2 console verification logger ───────────────────── */
+
+function logPhase2Results(results, stats, projectionDate) {
+  console.group('%cHitlist Hatcher — Phase 2 Results', 'color:#003087;font-weight:bold;font-size:14px;');
+
+  console.log(`%cProjection date: ${formatDateFull(projectionDate)}`, 'font-style:italic;');
+
+  console.log('%cReadiness Summary (full roster)', 'font-weight:bold;');
+  console.table({
+    'Total':          stats.total,
+    'Fully Ready':    `${stats.fullyReady} (${stats.fullyReadyPct}%)`,
+    'Not Ready':      `${stats.notReady} (${stats.notReadyPct}%)`,
+    'Partial':        `${stats.partial} (${stats.partialPct}%)`,
+    'Indeterminate':  `${stats.indeterminate} (${stats.indeterminatePct}%)`,
+  });
+
+  console.log(`%c${results.length} personnel flagged (due or upcoming)`, 'font-weight:bold;');
+  console.table(results.slice(0, 10).map(r => ({
+    name:          r.person.name,
+    rank:          r.person.rank,
+    overallStatus: r.overallStatus,
+    pha:           r.items.pha.status,
+    dental:        r.items.dental.displayText || r.items.dental.status,
+    hiv:           r.items.hiv.status,
+    audio:         r.items.audio.status,
+    immGrouped:    `${r.items.immunizations.grouped.count} due (${r.items.immunizations.grouped.status})`,
+    immTooltip:    r.items.immunizations.grouped.dueNames.join(', ') || '—',
+  })));
+
+  console.log('%cFull results array: window._hhResults', 'color:#1e8449;font-style:italic;');
+  window._hhResults = results;
+  window._hhStats   = stats;
+
+  console.groupEnd();
+}
 
 
 /* ── 10. SETTINGS PERSISTENCE ──────────────────────────────── */
@@ -729,25 +1092,26 @@ function wireExportPdfHandler() {
 /* ── 12. UTILITIES ─────────────────────────────────────────── */
 
 function formatBytes(bytes) {
-  if (bytes < 1024)        return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024)         return `${bytes} B`;
+  if (bytes < 1024 * 1024)  return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+// Abbreviated date for hit list cells (e.g. "15 JAN")
 function formatDate(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return '';
   const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   return `${date.getDate()} ${months[date.getMonth()]}`;
 }
 
-// Full date format for console verification and diagnostics only.
-// The hit list display uses formatDate() (no year) for column width efficiency.
+// Full date for console verification only (e.g. "15 JAN 2026")
 function formatDateFull(date) {
   if (!date || !(date instanceof Date) || isNaN(date)) return '';
   const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   return `${date.getDate()} ${months[date.getMonth()]} ${date.getFullYear()}`;
 }
 
+// Returns days between two dates. Positive = dateA is in the future relative to dateB.
 function daysDiff(dateA, dateB) {
   const msPerDay = 1000 * 60 * 60 * 24;
   return Math.round((dateA - dateB) / msPerDay);
@@ -764,9 +1128,6 @@ function debounce(fn, delay) {
 function updateColumnCounter(count) {
   dom.columnCount.textContent = count;
   dom.columnCounter.classList.remove('warn-yellow', 'warn-red');
-  if (count >= COL_WARN_RED) {
-    dom.columnCounter.classList.add('warn-red');
-  } else if (count >= COL_WARN_YELLOW) {
-    dom.columnCounter.classList.add('warn-yellow');
-  }
+  if (count >= COL_WARN_RED)         dom.columnCounter.classList.add('warn-red');
+  else if (count >= COL_WARN_YELLOW) dom.columnCounter.classList.add('warn-yellow');
 }
