@@ -55,6 +55,7 @@ const COL = {
   PHA_DUE:          'PHA Due',
   DENTAL_DT:        'Dental Exam Dt',
   DENTAL_DUE:       'Dental Exam Due',
+  DENTAL_CLASS:     'Dental Cond Code',
   HIV_DT:           'HIV Test Dt',
   HIV_DUE:          'HIV Test Due',
   AUDIO_DT:         'Audio 2216 Dt',
@@ -432,6 +433,17 @@ function parseMRRS(workbook) {
     }
   }
 
+  // ── 6d-ii. Helper: parse dental condition class ─────────────
+  // Returns the integer class (1, 2, 3, or 4).
+  // A blank or unrecognised value is treated as Class 4
+  // (no exam on record) per confirmed project decision.
+  function parseDentalClass(val) {
+    if (!val || String(val).trim() === '') return 4;
+    const n = parseInt(String(val).trim(), 10);
+    if (n === 1 || n === 2 || n === 3 || n === 4) return n;
+    return 4; // Unrecognised value → treat as unclassified
+  }
+   
   // ── 6e. Helper: normalise boolean-ish string fields ─────────
   // MRRS uses values like "Yes", "No", "Y", "N", blank, etc.
   // Returns true if the value suggests "required" or "yes".
@@ -501,6 +513,7 @@ function parseMRRS(workbook) {
       // Core readiness — due dates
       phaDue:      parseDate(getCell(row, 'PHA_DUE')),
       dentalDue:   dentalDueDate(row, false),   // false = 12-month method
+      dentalClass: parseDentalClass(getCell(row, 'DENTAL_CLASS')),
       hivDue:      parseDate(getCell(row, 'HIV_DUE')),
       audioDue:    parseDate(getCell(row, 'AUDIO_DUE')),
 
