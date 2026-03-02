@@ -683,6 +683,313 @@ html, body {
 
 /* ── 13. PRINT / PDF STYLES ────────────────────────────────── */
 
+/* ── PHASE 4 ADDITIONS — append before @media print block ── */
+
+/* Settings groups within cards */
+.settings-group {
+  margin-bottom: 14px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--gray-200);
+}
+.settings-group:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.settings-group-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--gray-400);
+  margin-bottom: 7px;
+}
+
+/* Checkbox labels */
+.cb-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+  color: var(--gray-700);
+  padding: 3px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.cb-label:hover { color: var(--gray-900); }
+.cb-label input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--navy); }
+
+.cb-label-imm { font-size: 12px; }
+
+.cb-label-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: var(--gray-700);
+  cursor: pointer;
+  user-select: none;
+  margin-right: 12px;
+}
+.cb-label-inline input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--navy); }
+
+/* Radio labels */
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--gray-700);
+  padding: 2px 0;
+  cursor: pointer;
+  user-select: none;
+}
+.radio-label input[type="radio"] { accent-color: var(--navy); cursor: pointer; }
+
+/* Dental sub-toggle */
+.dental-sub {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  margin: 4px 0 6px 21px;
+}
+.dental-sub-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-400);
+  display: block;
+  margin-bottom: 5px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+.dental-sub.hidden { display: none; }
+
+/* Settings row (label + control) */
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.settings-row:last-child { margin-bottom: 0; }
+
+.settings-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--gray-700);
+  min-width: 70px;
+  flex-shrink: 0;
+}
+
+.settings-input {
+  flex: 1;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--gray-900);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.settings-input:focus { border-color: var(--navy); }
+
+.settings-date {
+  width: 100%;
+  flex: none;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--gray-900);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.settings-date:focus { border-color: var(--navy); }
+
+.settings-select {
+  flex: 1;
+  padding: 7px 8px;
+  font-family: var(--font);
+  font-size: 13px;
+  color: var(--gray-900);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  outline: none;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.settings-select:focus { border-color: var(--navy); }
+
+.settings-textarea {
+  flex: 1;
+  padding: 7px 10px;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--gray-900);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  outline: none;
+  resize: vertical;
+  line-height: 1.5;
+  transition: border-color 0.15s;
+}
+.settings-textarea:focus { border-color: var(--navy); }
+
+.inline-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Immunization mode toggle (Grouped / Individual) */
+.imm-mode-toggle {
+  display: flex;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.toggle-seg {
+  flex: 1;
+  padding: 6px 8px;
+  font-family: var(--font);
+  font-size: 12px;
+  font-weight: 600;
+  border: none;
+  background: var(--gray-50);
+  color: var(--gray-400);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-right: 1px solid var(--gray-200);
+}
+.toggle-seg:last-child { border-right: none; }
+.toggle-seg:hover      { background: var(--gray-100); color: var(--gray-700); }
+.toggle-seg.active     { background: var(--navy); color: var(--white); }
+
+/* Immunization checkboxes grid */
+.imm-checkboxes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  margin-bottom: 6px;
+}
+
+/* Imm select/clear actions */
+.imm-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+.imm-actions-sep { color: var(--gray-300); font-size: 12px; }
+
+/* Small text button */
+.btn-text-sm {
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--navy);
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-text-sm:hover { color: var(--navy-dark); }
+
+/* Warning thresholds */
+.threshold-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.threshold-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.threshold-swatch {
+  width: 12px; height: 12px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+.th-red    { background: var(--red-light); border: 1px solid var(--red); }
+.th-yellow { background: var(--yellow-light); border: 1px solid var(--yellow); }
+.th-green  { background: var(--green-light); border: 1px solid var(--green); }
+
+.threshold-label {
+  font-size: 12px;
+  color: var(--gray-700);
+  flex: 1;
+}
+.threshold-input {
+  width: 52px;
+  padding: 4px 6px;
+  font-family: var(--font);
+  font-size: 13px;
+  text-align: center;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  outline: none;
+  transition: border-color 0.15s;
+}
+.threshold-input:focus { border-color: var(--navy); }
+.threshold-unit {
+  font-size: 12px;
+  color: var(--gray-400);
+  min-width: 28px;
+}
+.threshold-error {
+  font-size: 11px;
+  color: var(--red);
+  margin-top: 4px;
+  min-height: 16px;
+  font-weight: 600;
+}
+
+/* Emblem controls */
+.emblem-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.emblem-upload-btn {
+  display: inline-block;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.emblem-preview-thumb {
+  width: 36px; height: 36px;
+  border-radius: 4px;
+  border: 1px solid var(--gray-200);
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: var(--gray-50);
+}
+.emblem-preview-thumb.has-image { border-color: var(--navy-light); }
+
+/* Projection date hint */
+.projection-hint {
+  font-size: 11px;
+  color: var(--gray-400);
+  margin-top: 6px;
+  line-height: 1.5;
+  font-style: italic;
+}
+
+/* Hidden utility */
+.hidden { display: none !important; }
+
 .print-only { display: none; }
 
 @media print {
