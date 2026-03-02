@@ -4,29 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hitlist Hatcher 3.0</title>
-
-  <!--
-    ============================================================
-    HITLIST HATCHER 3.0
-    Browser-based MRRS medical readiness hit list generator.
-    All processing happens locally — no data leaves this machine.
-    ============================================================
-
-    EXTERNAL LIBRARIES (loaded from CDN, no installation needed):
-    - SheetJS (xlsx): Parses MRRS .xlsx files in the browser
-  -->
-
-  <!-- SheetJS: parses Excel files client-side -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-
-  <!-- App styles -->
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-  <!-- ============================================================
-       APP HEADER
-  ============================================================ -->
   <header class="app-header">
     <div class="app-header-inner">
       <h1 class="app-title">Hitlist Hatcher <span class="version-badge">3.0</span></h1>
@@ -34,15 +16,12 @@
     </div>
   </header>
 
-  <!-- ============================================================
-       MAIN LAYOUT: two columns — settings left, preview right
-  ============================================================ -->
   <main class="app-layout">
 
-    <!-- ── LEFT PANEL: Settings ─────────────────────────────── -->
+    <!-- ── LEFT PANEL: Settings ───────────────────────────── -->
     <aside class="settings-panel" id="settingsPanel">
 
-      <!-- File Upload Card -->
+      <!-- ── Card 1: Upload ─────────────────────────────── -->
       <section class="card" id="uploadCard">
         <h2 class="card-title">1. Upload MRRS File</h2>
         <div class="upload-area" id="uploadArea">
@@ -57,35 +36,209 @@
         <div class="upload-status" id="uploadStatus"></div>
       </section>
 
-      <!-- Report Items Card (placeholder — built in Phase 4) -->
+      <!-- ── Card 2: Report Items ───────────────────────── -->
       <section class="card" id="reportItemsCard">
         <h2 class="card-title">2. Report Items</h2>
-        <p class="card-placeholder">Report item selection will be built in Phase 4.</p>
+
+        <!-- Basic -->
+        <div class="settings-group">
+          <div class="settings-group-label">Basic</div>
+          <label class="cb-label">
+            <input type="checkbox" id="item-pha" checked />
+            PHA
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" id="item-dental" checked />
+            Dental Exam
+          </label>
+          <!-- Dental sub-toggle — shown only when Dental is checked -->
+          <div class="dental-sub" id="dentalSub">
+            <span class="dental-sub-label">Due date method:</span>
+            <label class="radio-label">
+              <input type="radio" name="dentalDate" value="12month" checked />
+              12-Month (365 days from exam)
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="dentalDate" value="mrrs" />
+              MRRS-supplied date
+            </label>
+          </div>
+          <label class="cb-label">
+            <input type="checkbox" id="item-hiv" checked />
+            HIV Lab
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" id="item-audio" checked />
+            Audiogram
+          </label>
+        </div>
+
+        <!-- Immunizations -->
+        <div class="settings-group">
+          <div class="settings-group-label">Immunizations</div>
+
+          <!-- Grouped / Individual toggle — most prominent control in this section -->
+          <div class="imm-mode-toggle" id="immModeToggle">
+            <button class="toggle-seg active" id="immModeGroupedBtn" data-mode="grouped">
+              Grouped Column
+            </button>
+            <button class="toggle-seg" id="immModeIndividualBtn" data-mode="individual">
+              Individual Columns
+            </button>
+          </div>
+
+          <!-- Vaccine checkboxes — populated dynamically by initSettingsPanel() -->
+          <div class="imm-checkboxes" id="immCheckboxes"></div>
+
+          <div class="imm-actions">
+            <button class="btn-text-sm" id="immSelectAll">Select All</button>
+            <span class="imm-actions-sep">·</span>
+            <button class="btn-text-sm" id="immClearAll">Clear All</button>
+          </div>
+        </div>
+
+        <!-- Deployment -->
+        <div class="settings-group">
+          <div class="settings-group-label">Deployment</div>
+          <label class="cb-label">
+            <input type="checkbox" id="item-pdha" />
+            PDHA
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" id="item-pdhra" />
+            PDHRA
+          </label>
+        </div>
+
+        <!-- Other -->
+        <div class="settings-group">
+          <div class="settings-group-label">Other</div>
+          <label class="cb-label">
+            <input type="checkbox" id="item-tst" />
+            TST Due
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" id="item-tstQuest" />
+            TST Quest
+          </label>
+          <label class="cb-label">
+            <input type="checkbox" id="item-wellWoman" />
+            Well-Woman
+          </label>
+        </div>
+
       </section>
 
-      <!-- Display Options Card (placeholder) -->
+      <!-- ── Card 3: Display Options ────────────────────── -->
       <section class="card" id="displayCard">
         <h2 class="card-title">3. Display Options</h2>
-        <p class="card-placeholder">Display options will be built in Phase 4.</p>
+
+        <div class="settings-row">
+          <label class="settings-label" for="offEnlFilter">Personnel</label>
+          <select id="offEnlFilter" class="settings-select">
+            <option value="combined">Combined (Officers + Enlisted)</option>
+            <option value="officer">Officers Only</option>
+            <option value="enlisted">Enlisted Only</option>
+            <option value="separate">Separate Reports</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <label class="settings-label" for="sortBy">Sort By</label>
+          <select id="sortBy" class="settings-select">
+            <option value="name">Last Name (A–Z)</option>
+            <option value="section">Section, then Last Name</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Columns</span>
+          <div class="inline-checks">
+            <label class="cb-label-inline">
+              <input type="checkbox" id="showRank" checked /> Rank/Rate
+            </label>
+            <label class="cb-label-inline">
+              <input type="checkbox" id="showSection" checked /> Section
+            </label>
+          </div>
+        </div>
+
+        <!-- Warning Thresholds -->
+        <div class="settings-group" style="margin-top:10px;">
+          <div class="settings-group-label">Warning Windows</div>
+          <div class="threshold-grid">
+            <div class="threshold-item">
+              <div class="threshold-swatch th-red"></div>
+              <label class="threshold-label" for="threshYellow">Yellow within</label>
+              <input type="number" id="threshYellow" class="threshold-input" value="7" min="1" max="364" />
+              <span class="threshold-unit">days</span>
+            </div>
+            <div class="threshold-item">
+              <div class="threshold-swatch th-green"></div>
+              <label class="threshold-label" for="threshGreen">Green within</label>
+              <input type="number" id="threshGreen" class="threshold-input" value="30" min="1" max="365" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="threshold-error" id="threshError"></div>
+        </div>
+
       </section>
 
-      <!-- Unit Customization Card (placeholder) -->
+      <!-- ── Card 4: Unit Customization ────────────────── -->
       <section class="card" id="unitCard">
         <h2 class="card-title">4. Unit Customization</h2>
-        <p class="card-placeholder">Unit customization will be built in Phase 4.</p>
+
+        <div class="settings-row">
+          <label class="settings-label" for="unitName">Unit Name</label>
+          <input type="text" id="unitName" class="settings-input"
+                 placeholder="e.g. VMFA-314" maxlength="40" />
+        </div>
+
+        <div class="settings-row" style="align-items:flex-start;">
+          <span class="settings-label" style="padding-top:4px;">Emblem</span>
+          <div class="emblem-controls">
+            <label class="btn-secondary emblem-upload-btn" for="emblemInput">
+              &#128247; Upload Image
+            </label>
+            <input type="file" id="emblemInput" accept=".jpg,.jpeg,.png" hidden />
+            <button class="btn-text-sm btn-remove-emblem hidden" id="clearEmblemBtn">
+              Remove
+            </button>
+            <div id="emblemPreview" class="emblem-preview-thumb"></div>
+          </div>
+        </div>
+
+        <div class="settings-row" style="align-items:flex-start;">
+          <label class="settings-label" for="customText" style="padding-top:6px;">
+            Info Text
+          </label>
+          <textarea id="customText" class="settings-textarea" rows="4"
+            placeholder="Clinic hours, phone numbers, instructions..."></textarea>
+        </div>
+
       </section>
 
-      <!-- Generate Button -->
+      <!-- ── Card 5: Projection Date ────────────────────── -->
+      <section class="card" id="projectionCard">
+        <h2 class="card-title">5. Projection Date</h2>
+        <input type="date" id="projectionDate" class="settings-input settings-date" />
+        <p class="projection-hint">
+          Personnel due on or before this date will appear on the hit list.
+        </p>
+      </section>
+
+      <!-- ── Generate ───────────────────────────────────── -->
       <button class="btn-generate" id="generateBtn" disabled>
         Generate Hit List
       </button>
 
-      <!-- Column Counter (placeholder) -->
+      <!-- Column counter -->
       <div class="column-counter" id="columnCounter">
         Estimated columns: <span id="columnCount">--</span>
       </div>
 
-      <!-- Settings persistence buttons -->
+      <!-- Settings persistence -->
       <div class="settings-actions">
         <button class="btn-secondary" id="exportSettingsBtn">Export Settings</button>
         <label class="btn-secondary" for="importSettingsInput">Import Settings</label>
@@ -94,33 +247,26 @@
 
     </aside>
 
-    <!-- ── RIGHT PANEL: Preview ──────────────────────────────── -->
+    <!-- ── RIGHT PANEL: Preview ───────────────────────── -->
     <section class="preview-panel" id="previewPanel">
       <div class="preview-placeholder" id="previewPlaceholder">
         <div class="preview-placeholder-icon">&#128203;</div>
         <p>Your hit list will appear here after uploading a MRRS file and clicking <strong>Generate Hit List</strong>.</p>
       </div>
-
-      <!-- The rendered hit list is injected here by app.js -->
       <div class="report-output" id="reportOutput"></div>
     </section>
 
   </main>
 
-  <!-- ============================================================
-       PRINT-ONLY AREA
-       Populated by app.js before window.print() is called.
-       Hidden on screen; visible only in print/PDF output.
-  ============================================================ -->
+  <!-- Print-only output area -->
   <div class="print-only" id="printOutput"></div>
 
-  <!-- Export PDF button (shown only when a report exists) -->
+  <!-- Export bar (shown after report is generated) -->
   <div class="export-bar" id="exportBar" hidden>
     <span class="export-hint">In the print dialog, set Destination to &#8220;Save as PDF&#8221;</span>
     <button class="btn-export" id="exportPdfBtn">&#128438; Export PDF</button>
   </div>
 
-  <!-- App logic -->
   <script src="app.js"></script>
 
 </body>
