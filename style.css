@@ -29,29 +29,29 @@
 /* ── 1. VARIABLES & RESET ──────────────────────────────────── */
 
 :root {
-  --navy:         #003087;
-  --navy-dark:    #001f5b;
-  --navy-light:   #d6e4f0;
-  --navy-mid:     #1a4a8a;
+  --navy:         #1e3a5f;
+  --navy-dark:    #152d4a;
+  --navy-light:   #d0dcea;
+  --navy-mid:     #2a4f80;
   --gold:         #b8860b;
   --white:        #ffffff;
-  --gray-50:      #f8f9fa;
+  --gray-50:      #f7f8f9;
   --gray-100:     #f0f2f5;
-  --gray-200:     #e0e4ea;
-  --gray-300:     #c8cdd6;
-  --gray-400:     #9aa3b0;
-  --gray-700:     #444c5c;
-  --gray-900:     #1a1e27;
+  --gray-200:     #e2e6ec;
+  --gray-300:     #c8ceda;
+  --gray-400:     #8a96a8;
+  --gray-700:     #3a4252;
+  --gray-900:     #1e2630;
 
   --red:          #c0392b;
-  --red-dark:     #922b21;
-  --red-light:    #fadbd8;
-  --yellow:       #b7770d;
-  --yellow-dark:  #7d6608;
-  --yellow-light: #fef9e7;
-  --green:        #1e8449;
-  --green-dark:   #1a5e35;
-  --green-light:  #d5f5e3;
+  --red-dark:     #6a2018;
+  --red-light:    #e8b4ae;
+  --yellow:       #a07828;
+  --yellow-dark:  #584010;
+  --yellow-light: #e0cc9a;
+  --green:        #2e7a52;
+  --green-dark:   #1a3e28;
+  --green-light:  #a4c8b4;
 
   --font:         'Arial', sans-serif;
   --radius:       6px;
@@ -450,16 +450,16 @@ html, body {
   line-height: 1.2;
 }
 
-.hitlist-stat-value.stat-good   { color: #6ee098; }
-.hitlist-stat-value.stat-warn   { color: #ffd166; }
-.hitlist-stat-value.stat-bad    { color: #ff8a80; }
-.hitlist-stat-value.stat-neutral{ color: #aab4c4; }
+.hitlist-stat-value.stat-good   { color: #86efac; }
+.hitlist-stat-value.stat-warn   { color: #fcd34d; }
+.hitlist-stat-value.stat-bad    { color: #fca5a5; }
+.hitlist-stat-value.stat-neutral{ color: #94a3b8; }
 
 /* 10d. Custom info text area */
 .hitlist-info-bar {
-  background: var(--gray-50);
-  border-top: 2px solid var(--navy-light);
-  border-bottom: 2px solid var(--navy-light);
+  background: #f7f8f9;
+  border-top: 1px solid var(--gray-200);
+  border-bottom: 1px solid var(--gray-200);
   padding: 8px 16px;
   font-size: 11px;
   color: var(--gray-700);
@@ -522,7 +522,7 @@ html, body {
 
 .hitlist-table th {
   background: var(--navy);
-  color: var(--white);
+  color: #bfcfe8;
   font-weight: 700;
   font-size: 11px;
   text-transform: uppercase;
