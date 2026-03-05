@@ -16,13 +16,25 @@
        10a. Wrapper & overall structure
        10b. Report header
        10c. Readiness summary bar
-       10d. Legend
-       10e. Personnel table
-       10f. Cell status colors
-       10g. Grouped immunization tooltip
+       10d. Info bar (multi-column)
+       10e. Legend
+       10f. Personnel table
+       10g. Cell status colors
+       10h. Grouped immunization tooltip
    11. Export Bar
-   12. Utilities
-   13. Print / PDF Styles
+   12. Settings Panel Controls
+       12a. Groups & labels
+       12b. Checkboxes & radios
+       12c. Dental sub-toggle
+       12d. Rows, inputs, selects, textareas
+       12e. Immunization toggle & grid
+       12f. Warning thresholds
+       12g. Emblem controls
+       12h. Info column editor
+       12i. Tooltip trigger & floating tooltip
+   13. Privacy Disclaimer Modal
+   14. Utilities
+   15. Print / PDF Styles
 ============================================================ */
 
 
@@ -282,6 +294,19 @@ html, body {
 
 .btn-export:hover { background: var(--navy-dark); }
 
+.btn-text-sm {
+  background: none;
+  border: none;
+  font-family: var(--font);
+  font-size: 12px;
+  color: var(--navy);
+  cursor: pointer;
+  padding: 2px 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.btn-text-sm:hover { color: var(--navy-dark); }
+
 
 /* ── 7. COLUMN COUNTER ─────────────────────────────────────── */
 
@@ -335,6 +360,8 @@ html, body {
   gap: 16px;
 }
 
+.preview-placeholder.hidden { display: none; }
+
 .preview-placeholder-icon {
   font-size: 64px;
   opacity: 0.4;
@@ -355,7 +382,7 @@ html, body {
   border-radius: var(--radius);
   box-shadow: var(--shadow-md);
   overflow: hidden;
-  margin-bottom: 80px; /* room for the export bar */
+  margin-bottom: 80px;
 }
 
 /* 10b. Report header */
@@ -395,9 +422,7 @@ html, body {
   padding: 4px;
 }
 
-.hitlist-title-block {
-  text-align: center;
-}
+.hitlist-title-block { text-align: center; }
 
 .hitlist-unit-name {
   font-size: 22px;
@@ -432,7 +457,6 @@ html, body {
   padding: 8px 4px;
   border-right: 1px solid rgba(255,255,255,0.08);
 }
-
 .hitlist-stat:last-child { border-right: none; }
 
 .hitlist-stat-label {
@@ -450,22 +474,43 @@ html, body {
   line-height: 1.2;
 }
 
-.hitlist-stat-value.stat-good   { color: #86efac; }
-.hitlist-stat-value.stat-warn   { color: #fcd34d; }
-.hitlist-stat-value.stat-bad    { color: #fca5a5; }
-.hitlist-stat-value.stat-neutral{ color: #94a3b8; }
+.hitlist-stat-value.stat-good    { color: #86efac; }
+.hitlist-stat-value.stat-warn    { color: #fcd34d; }
+.hitlist-stat-value.stat-bad     { color: #fca5a5; }
+.hitlist-stat-value.stat-neutral { color: #94a3b8; }
 
-/* 10d. Custom info text area */
+/* 10d. Info bar — multi-column */
 .hitlist-info-bar {
-  background: #f7f8f9;
+  background: var(--gray-50);
   border-top: 1px solid var(--gray-200);
   border-bottom: 1px solid var(--gray-200);
-  padding: 8px 16px;
   font-size: 11px;
   color: var(--gray-700);
   line-height: 1.5;
+}
+
+.hitlist-info-bar:not(.hitlist-info-grid) {
+  padding: 8px 16px;
   white-space: pre-wrap;
 }
+
+.hitlist-info-grid {
+  display: grid;
+  padding: 0;
+}
+
+.hitlist-info-grid .info-col {
+  padding: 7px 14px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--gray-700);
+  border-right: 1px solid var(--gray-200);
+}
+.hitlist-info-grid .info-col:last-child { border-right: none; }
+
+.info-col-left   { text-align: left; }
+.info-col-center { text-align: center; }
+.info-col-right  { text-align: right; }
 
 /* 10e. Legend */
 .hitlist-legend {
@@ -509,12 +554,11 @@ html, body {
 .legend-swatch.none   { background: var(--white); }
 
 /* 10f. Personnel table */
-.hitlist-table-wrapper {
-  overflow-x: auto;
-}
+.hitlist-table-wrapper { overflow-x: auto; }
 
 .hitlist-table {
   width: 100%;
+  table-layout: auto;
   border-collapse: collapse;
   font-size: 12px;
   min-width: 500px;
@@ -547,42 +591,24 @@ html, body {
   font-size: 11px;
 }
 
-/* Alternating row shading */
-.hitlist-table tbody tr:nth-child(odd) td {
-  background: var(--white);
-}
+.hitlist-table tbody tr:nth-child(odd)  td { background: var(--white); }
+.hitlist-table tbody tr:nth-child(even) td { background: var(--gray-50); }
 
-.hitlist-table tbody tr:nth-child(even) td {
-  background: var(--gray-50);
-}
-
-/* Name column */
 .hitlist-table td.col-name {
   text-align: left;
   font-weight: 600;
   padding-left: 10px;
-  min-width: 140px;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* Rank column */
-.hitlist-table td.col-rank {
-  min-width: 50px;
-  font-weight: 600;
-}
+.hitlist-table td.col-rank    { width: 48px;  min-width: 48px;  white-space: nowrap; font-weight: 600; }
+.hitlist-table td.col-section { width: 60px;  min-width: 60px;  white-space: nowrap; font-size: 10px; color: var(--gray-400); }
+.hitlist-table td.col-item    { width: 62px;  min-width: 58px;  max-width: 72px; white-space: nowrap; }
 
-/* Section column */
-.hitlist-table td.col-section {
-  min-width: 70px;
-  font-size: 10px;
-  color: var(--gray-700);
-}
-
-/* Generic data cell */
-.hitlist-table td.col-item {
-  min-width: 62px;
-}
-
-/* 10g. Cell status colors — override alternating row background */
+/* 10g. Cell status colors */
 .hitlist-table td.status-red {
   background: var(--red-light) !important;
   color: var(--red-dark);
@@ -599,6 +625,11 @@ html, body {
   background: var(--green-light) !important;
   color: var(--green-dark);
   font-weight: 600;
+}
+
+.hitlist-table td.cell-na {
+  color: var(--gray-300);
+  font-size: 10px;
 }
 
 /* 10h. Grouped immunization tooltip */
@@ -626,11 +657,8 @@ html, body {
   line-height: 1.6;
 }
 
-.imm-grouped:hover .imm-tooltip {
-  display: block;
-}
+.imm-grouped:hover .imm-tooltip { display: block; }
 
-/* Force tooltip to stay on screen at left/right edges */
 .hitlist-table td:first-child .imm-grouped .imm-tooltip,
 .hitlist-table td:nth-child(2) .imm-grouped .imm-tooltip {
   left: 0;
@@ -641,12 +669,6 @@ html, body {
   left: auto;
   right: 0;
   transform: none;
-}
-
-/* No-data cell */
-.hitlist-table td.cell-na {
-  color: var(--gray-300);
-  font-size: 10px;
 }
 
 
@@ -675,17 +697,9 @@ html, body {
 }
 
 
-/* ── 12. UTILITIES ─────────────────────────────────────────── */
+/* ── 12. SETTINGS PANEL CONTROLS ───────────────────────────── */
 
-.hidden  { display: none !important; }
-.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
-
-
-/* ── 13. PRINT / PDF STYLES ────────────────────────────────── */
-
-/* ── PHASE 4 ADDITIONS — append before @media print block ── */
-
-/* Settings groups within cards */
+/* 12a. Groups & labels */
 .settings-group {
   margin-bottom: 14px;
   padding-bottom: 14px;
@@ -698,6 +712,9 @@ html, body {
 }
 
 .settings-group-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
@@ -706,7 +723,7 @@ html, body {
   margin-bottom: 7px;
 }
 
-/* Checkbox labels */
+/* 12b. Checkboxes & radios */
 .cb-label {
   display: flex;
   align-items: center;
@@ -718,7 +735,12 @@ html, body {
   user-select: none;
 }
 .cb-label:hover { color: var(--gray-900); }
-.cb-label input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--navy); }
+.cb-label input[type="checkbox"] {
+  width: 14px; height: 14px;
+  cursor: pointer;
+  accent-color: var(--navy);
+  flex-shrink: 0;
+}
 
 .cb-label-imm { font-size: 12px; }
 
@@ -732,9 +754,12 @@ html, body {
   user-select: none;
   margin-right: 12px;
 }
-.cb-label-inline input[type="checkbox"] { width: 14px; height: 14px; cursor: pointer; accent-color: var(--navy); }
+.cb-label-inline input[type="checkbox"] {
+  width: 14px; height: 14px;
+  cursor: pointer;
+  accent-color: var(--navy);
+}
 
-/* Radio labels */
 .radio-label {
   display: flex;
   align-items: center;
@@ -747,7 +772,7 @@ html, body {
 }
 .radio-label input[type="radio"] { accent-color: var(--navy); cursor: pointer; }
 
-/* Dental sub-toggle */
+/* 12c. Dental sub-toggle */
 .dental-sub {
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
@@ -766,7 +791,7 @@ html, body {
 }
 .dental-sub.hidden { display: none; }
 
-/* Settings row (label + control) */
+/* 12d. Rows, inputs, selects, textareas */
 .settings-row {
   display: flex;
   align-items: center;
@@ -799,7 +824,6 @@ html, body {
 
 .settings-date {
   width: 100%;
-  flex: none;
   padding: 7px 10px;
   font-family: var(--font);
   font-size: 13px;
@@ -843,13 +867,9 @@ html, body {
 }
 .settings-textarea:focus { border-color: var(--navy); }
 
-.inline-checks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-}
+.inline-checks { display: flex; flex-wrap: wrap; gap: 4px; }
 
-/* Immunization mode toggle (Grouped / Individual) */
+/* 12e. Immunization mode toggle & checkbox grid */
 .imm-mode-toggle {
   display: flex;
   border: 1px solid var(--gray-200);
@@ -857,6 +877,7 @@ html, body {
   overflow: hidden;
   margin-bottom: 10px;
 }
+
 .toggle-seg {
   flex: 1;
   padding: 6px 8px;
@@ -874,7 +895,6 @@ html, body {
 .toggle-seg:hover      { background: var(--gray-100); color: var(--gray-700); }
 .toggle-seg.active     { background: var(--navy); color: var(--white); }
 
-/* Immunization checkboxes grid */
 .imm-checkboxes {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -882,54 +902,24 @@ html, body {
   margin-bottom: 6px;
 }
 
-/* Imm select/clear actions */
-.imm-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 4px;
-}
+.imm-actions { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 .imm-actions-sep { color: var(--gray-300); font-size: 12px; }
 
-/* Small text button */
-.btn-text-sm {
-  background: none;
-  border: none;
-  font-family: var(--font);
-  font-size: 12px;
-  color: var(--navy);
-  cursor: pointer;
-  padding: 2px 0;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-}
-.btn-text-sm:hover { color: var(--navy-dark); }
+/* 12f. Warning thresholds */
+.threshold-grid { display: flex; flex-direction: column; gap: 6px; }
+.threshold-item { display: flex; align-items: center; gap: 8px; }
 
-/* Warning thresholds */
-.threshold-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.threshold-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
 .threshold-swatch {
   width: 12px; height: 12px;
   border-radius: 3px;
   flex-shrink: 0;
 }
-.th-red    { background: var(--red-light); border: 1px solid var(--red); }
-.th-yellow { background: var(--yellow-light); border: 1px solid var(--yellow); }
-.th-green  { background: var(--green-light); border: 1px solid var(--green); }
 
-.threshold-label {
-  font-size: 12px;
-  color: var(--gray-700);
-  flex: 1;
-}
+.th-yellow { background: var(--yellow-light); border: 1px solid var(--yellow); }
+.th-green  { background: var(--green-light);  border: 1px solid var(--green); }
+
+.threshold-label { font-size: 12px; color: var(--gray-700); flex: 1; }
+
 .threshold-input {
   width: 52px;
   padding: 4px 6px;
@@ -942,11 +932,9 @@ html, body {
   transition: border-color 0.15s;
 }
 .threshold-input:focus { border-color: var(--navy); }
-.threshold-unit {
-  font-size: 12px;
-  color: var(--gray-400);
-  min-width: 28px;
-}
+
+.threshold-unit  { font-size: 12px; color: var(--gray-400); min-width: 28px; }
+
 .threshold-error {
   font-size: 11px;
   color: var(--red);
@@ -955,18 +943,10 @@ html, body {
   font-weight: 600;
 }
 
-/* Emblem controls */
-.emblem-controls {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.emblem-upload-btn {
-  display: inline-block;
-  cursor: pointer;
-  white-space: nowrap;
-}
+/* 12g. Emblem controls */
+.emblem-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.emblem-upload-btn { display: inline-block; cursor: pointer; white-space: nowrap; }
+
 .emblem-preview-thumb {
   width: 36px; height: 36px;
   border-radius: 4px;
@@ -978,7 +958,6 @@ html, body {
 }
 .emblem-preview-thumb.has-image { border-color: var(--navy-light); }
 
-/* Projection date hint */
 .projection-hint {
   font-size: 11px;
   color: var(--gray-400);
@@ -987,8 +966,206 @@ html, body {
   font-style: italic;
 }
 
-/* Hidden utility */
-.hidden { display: none !important; }
+/* 12h. Info column editor */
+.info-col-container {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.info-col-editor {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.info-col-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  background: var(--gray-50);
+  border-bottom: 1px solid var(--gray-200);
+}
+
+.info-col-num {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--gray-400);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.info-align-select {
+  font-family: var(--font);
+  font-size: 11px;
+  padding: 2px 4px;
+  border: 1px solid var(--gray-200);
+  border-radius: 3px;
+  background: var(--white);
+  color: var(--gray-700);
+  outline: none;
+  cursor: pointer;
+}
+
+.info-col-textarea {
+  width: 100%;
+  border: none;
+  border-radius: 0;
+  flex: none;
+}
+.info-col-textarea:focus { outline: none; }
+
+/* 12i. Tooltip trigger & floating tooltip */
+.tooltip-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  font-size: 12px;
+  color: var(--navy);
+  opacity: 0.5;
+  cursor: help;
+  user-select: none;
+  transition: opacity 0.15s;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+.tooltip-trigger:hover { opacity: 1; }
+
+.floating-tooltip {
+  position: fixed;
+  z-index: 9999;
+  max-width: 280px;
+  background: var(--gray-900);
+  color: #e8eaf0;
+  font-size: 12px;
+  line-height: 1.6;
+  padding: 10px 14px;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+  pointer-events: none;
+  display: none;
+}
+.floating-tooltip.visible { display: block; }
+.floating-tooltip strong  { color: #ffffff; }
+
+
+/* ── 13. PRIVACY DISCLAIMER MODAL ──────────────────────────── */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(10, 18, 35, 0.82);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  backdrop-filter: blur(2px);
+}
+.modal-overlay.hidden { display: none; }
+
+.modal-box {
+  background: var(--white);
+  border-radius: 10px;
+  max-width: 520px;
+  width: 100%;
+  box-shadow: 0 16px 60px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  background: var(--navy);
+  color: var(--white);
+}
+.modal-icon  { font-size: 22px; }
+.modal-title { font-size: 18px; font-weight: 700; letter-spacing: -0.3px; }
+
+.modal-body { padding: 20px 24px; }
+
+.modal-lead {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--gray-900);
+  margin-bottom: 14px;
+}
+.modal-lead strong { color: var(--navy); }
+
+.modal-list {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.modal-list li {
+  font-size: 13px;
+  color: var(--gray-700);
+  padding: 4px 0;
+  display: flex;
+  gap: 6px;
+}
+
+.modal-note {
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--gray-400);
+  border-top: 1px solid var(--gray-200);
+  padding-top: 12px;
+  font-style: italic;
+}
+
+.modal-footer {
+  padding: 14px 24px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--gray-200);
+}
+
+.modal-remember {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--gray-700);
+  cursor: pointer;
+  user-select: none;
+}
+.modal-remember input { accent-color: var(--navy); cursor: pointer; }
+
+.btn-modal-accept {
+  padding: 9px 20px;
+  background: var(--navy);
+  color: var(--white);
+  border: none;
+  border-radius: var(--radius);
+  font-family: var(--font);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+.btn-modal-accept:hover { background: var(--navy-dark); }
+
+
+/* ── 14. UTILITIES ─────────────────────────────────────────── */
+
+.hidden  { display: none !important; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); }
+
+
+/* ── 15. PRINT / PDF STYLES ────────────────────────────────── */
 
 .print-only { display: none; }
 
@@ -999,15 +1176,14 @@ html, body {
     print-color-adjust: exact !important;
   }
 
-  /* Hide all screen UI */
   .app-header,
   .settings-panel,
   .preview-panel,
-  .export-bar {
+  .export-bar,
+  .modal-overlay {
     display: none !important;
   }
 
-  /* Show only the print report */
   .print-only {
     display: block !important;
   }
@@ -1017,31 +1193,21 @@ html, body {
     margin: 0.35in 0.35in 0.45in 0.35in;
   }
 
-  /* Remove screen-only decoration from wrapper */
   .hitlist-wrapper {
     box-shadow: none;
     border-radius: 0;
     margin-bottom: 0;
   }
 
-  /* Prevent rows from splitting across pages */
-  .hitlist-table tr {
-    page-break-inside: avoid;
-  }
+  .hitlist-table tr   { page-break-inside: avoid; }
+  .imm-tooltip        { display: none !important; }
 
-  /* Never print tooltips */
-  .imm-tooltip {
-    display: none !important;
-  }
-
-  /* Keep header together */
   .hitlist-header,
   .hitlist-legend {
     page-break-inside: avoid;
     page-break-after: avoid;
   }
 
-  /* Tighten font sizes slightly for print density */
   .hitlist-table td,
   .hitlist-table th {
     font-size: 10px;
