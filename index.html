@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hitlist Hatcher 3.0</title>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ── Privacy Disclaimer Modal ───────────────────────────── -->
+  <div class="modal-overlay" id="disclaimerModal">
+    <div class="modal-box">
+
+      <div class="modal-header">
+        <div class="modal-lock">&#128274;</div>
+        <div class="modal-header-text">
+          <div class="modal-title">Data Privacy Notice</div>
+          <div class="modal-subtitle">Please read before continuing</div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <p class="modal-lead">Hitlist Hatcher processes medical readiness data <strong>entirely within your browser</strong>. No information is ever uploaded, transmitted, or stored on any server.</p>
+        <ul class="modal-checklist">
+          <li><span class="check-icon">&#10003;</span>MRRS data is read locally and never leaves your device</li>
+          <li><span class="check-icon">&#10003;</span>No analytics, cookies, or third-party services are used</li>
+          <li><span class="check-icon">&#10003;</span>Settings (not PHI) may be saved to browser local storage for convenience</li>
+          <li><span class="check-icon">&#10003;</span>Closing or refreshing the tab permanently discards all loaded data</li>
+        </ul>
+        <p class="modal-note">This tool is intended for use on authorized government or command-approved devices only. Users are responsible for ensuring the device, browser, and work environment comply with applicable DoD, HIPAA, and Privacy Act requirements. MRRS data contains PII — handle accordingly.</p>
+      </div>
+
+      <div class="modal-footer">
+        <label class="modal-remember">
+          <input type="checkbox" id="disclaimerRemember" />
+          Don't show again on this device
+        </label>
+        <button class="btn-modal-accept" id="disclaimerAccept">I Understand — Continue</button>
+      </div>
+
+    </div>
+  </div>
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge">3.0</span></h1>
+      <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
+      <div class="header-pills">
+        <button class="btn-pill" id="feedbackBtn">💬 Feedback</button>
+        <button class="btn-pill" id="tutorialBtn">❓ Tutorial</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="app-layout">
+
+    <!-- ── LEFT PANEL: Settings ───────────────────────────── -->
+    <aside class="settings-panel" id="settingsPanel">
+
+      <!-- Scrollable cards area -->
+      <div class="settings-scroll">
+
+      <!-- Card 1: Upload -->
+      <section class="card" id="uploadCard">
+        <h2 class="card-title">1. Upload MRRS File</h2>
+        <div class="upload-area" id="uploadArea">
+          <div class="upload-icon">&#128196;</div>
+          <p class="upload-prompt">
+            <strong>Drag &amp; drop</strong> your MRRS Excel file here<br />
+            or <label class="upload-link" for="fileInput">click to browse</label>
+          </p>
+          <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
+          <p class="upload-hint">Excel IMR Report (Details) export from MRRS</p>
+        </div>
+        <div class="upload-status" id="uploadStatus"></div>
+      </section>
+
+      <!-- Card 2: Report Items -->
+      <section class="card" id="reportItemsCard">
+        <h2 class="card-title">2. Report Items</h2>
+
+        <!-- Basic -->
+        <div class="settings-group" id="basicItemsGroup">
+          <div class="settings-group-label">Basic</div>
+          <label class="cb-label"><input type="checkbox" id="item-pha" checked /> PHA</label>
+          <label class="cb-label"><input type="checkbox" id="item-dental" checked /> Dental Exam
+            <span class="tip" data-tip-title="Dental Due Date Method" data-tip-body="&lt;p&gt;&lt;strong&gt;12-Month (default):&lt;/strong&gt; Adds exactly 365 days to the date of the most recent dental exam. This follows current instructions.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;MRRS-supplied date:&lt;/strong&gt; Uses the due date MRRS calculates directly — the first day of the second month after the exam month in the following year. This is often slightly different from the 365-day date.&lt;/p&gt;">💡</span>
+          </label>
+          <div class="dental-sub" id="dentalSub">
+            <span class="dental-sub-label">Due date method:</span>
+            <label class="radio-label"><input type="radio" name="dentalDate" value="12month" checked /> 12-Month (365 days from exam)</label>
+            <label class="radio-label"><input type="radio" name="dentalDate" value="mrrs" /> MRRS-supplied date</label>
+          </div>
+          <label class="cb-label"><input type="checkbox" id="item-hiv" checked /> HIV Lab</label>
+          <label class="cb-label"><input type="checkbox" id="item-audio" checked /> Audiogram</label>
+        </div>
+
+        <!-- Immunizations -->
+        <div class="settings-group" id="immSection">
+          <div class="settings-group-label">
+            Immunizations
+            <span class="tip" data-tip-title="Immunization Display Mode" data-tip-body="&lt;p&gt;&lt;strong&gt;Grouped Column:&lt;/strong&gt; Shows a single 'Immunizations' column with the count of due vaccines. Hover a cell to see which ones are due.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Individual Columns:&lt;/strong&gt; Creates one column per selected vaccine with each due date shown separately. Watch the column counter — too many vaccines will overflow the page.&lt;/p&gt;">💡</span>
+          </div>
+          <div class="imm-mode-toggle" id="immModeToggle">
+            <button class="toggle-seg active" id="immModeGroupedBtn" data-mode="grouped">Grouped Column</button>
+            <button class="toggle-seg" id="immModeIndividualBtn" data-mode="individual">Individual Columns</button>
+          </div>
+          <div class="imm-checkboxes" id="immCheckboxes"></div>
+          <div class="imm-actions">
+            <button class="btn-text-sm" id="immSelectAll">Select All</button>
+            <span class="imm-actions-sep">·</span>
+            <button class="btn-text-sm" id="immClearAll">Clear All</button>
+          </div>
+        </div>
+
+        <!-- Deployment -->
+        <div class="settings-group" id="deploymentGroup">
+          <div class="settings-group-label">Deployment</div>
+          <label class="cb-label"><input type="checkbox" id="item-pdha" /> PDHA</label>
+          <label class="cb-label"><input type="checkbox" id="item-pdhra" /> PDHRA</label>
+          <label class="cb-label"><input type="checkbox" id="item-mha2" /> MHA 2</label>
+          <label class="cb-label"><input type="checkbox" id="item-mha3" /> MHA 3</label>
+          <label class="cb-label"><input type="checkbox" id="item-mha4" /> MHA 4</label>
+          <label class="cb-label"><input type="checkbox" id="item-verifyGlasses" /> Verify Glasses</label>
+          <label class="cb-label"><input type="checkbox" id="item-verifyInserts" /> Verify Inserts</label>
+          <label class="cb-label"><input type="checkbox" id="item-warningTag" /> Verify Warning Tag</label>
+        </div>
+
+        <!-- Accessions -->
+        <div class="settings-group">
+          <div class="settings-group-label">Accessions</div>
+          <label class="cb-label"><input type="checkbox" id="item-bloodType" checked /> Blood Type</label>
+          <label class="cb-label"><input type="checkbox" id="item-refAudio" checked /> Ref Audiogram</label>
+          <label class="cb-label"><input type="checkbox" id="item-dna" checked /> DNA Sample</label>
+          <label class="cb-label"><input type="checkbox" id="item-g6pd" checked /> G6PD Test</label>
+          <label class="cb-label"><input type="checkbox" id="item-sickle" checked /> Sickle Cell Test</label>
+        </div>
+
+        <!-- Other -->
+        <div class="settings-group">
+          <div class="settings-group-label">Other</div>
+          <label class="cb-label"><input type="checkbox" id="item-tst" /> TST Due</label>
+          <label class="cb-label"><input type="checkbox" id="item-tstQuest" /> TST Quest</label>
+          <div class="tst-sub hidden" id="tstSub">
+            <label class="cb-label">
+              <input type="checkbox" id="item-tstCombine" />
+              ⛓ Combine into one column
+            </label>
+          </div>
+          <label class="cb-label">
+            <input type="checkbox" id="item-wellWoman" /> Well-Woman
+            <span class="tip" data-tip-title="Well-Woman Items" data-tip-body="&lt;p&gt;Tracks &lt;strong&gt;Mammogram&lt;/strong&gt; and &lt;strong&gt;Pap Smear&lt;/strong&gt; under a single column to protect privacy.&lt;/p&gt;&lt;p&gt;Only female personnel are evaluated. The cell reflects whichever item is most urgent.&lt;/p&gt;">💡</span>
+          </label>
+        </div>
+
+      </section>
+
+      <!-- Card 3: Display Options -->
+      <section class="card" id="displayCard">
+        <h2 class="card-title">3. Display Options</h2>
+
+        <div class="settings-row">
+          <label class="settings-label" for="offEnlFilter">Personnel</label>
+          <select id="offEnlFilter" class="settings-select">
+            <option value="combined">Combined (Officers + Enlisted)</option>
+            <option value="officer">Officers Only</option>
+            <option value="enlisted">Enlisted Only</option>
+            <option value="separate">Separate Reports</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <label class="settings-label" for="sortBy">Sort By</label>
+          <select id="sortBy" class="settings-select">
+            <option value="name">Last Name (A–Z)</option>
+            <option value="section">Section, then Last Name</option>
+          </select>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Columns</span>
+          <div class="inline-checks">
+            <label class="cb-label-inline"><input type="checkbox" id="showRank" checked /> Rank/Rate</label>
+            <label class="cb-label-inline"><input type="checkbox" id="showSection" checked /> Section</label>
+          </div>
+        </div>
+
+        <!-- Warning Thresholds -->
+        <div class="settings-group" style="margin-top:10px;">
+          <div class="settings-group-label">Warning Windows</div>
+          <div class="threshold-grid">
+            <div class="threshold-item">
+              <div class="threshold-swatch th-yellow"></div>
+              <label class="threshold-label" for="threshYellow">Yellow within</label>
+              <input type="number" id="threshYellow" class="threshold-input" value="7" min="1" max="364" />
+              <span class="threshold-unit">days</span>
+            </div>
+            <div class="threshold-item">
+              <div class="threshold-swatch th-green"></div>
+              <label class="threshold-label" for="threshGreen">Green within</label>
+              <input type="number" id="threshGreen" class="threshold-input" value="30" min="1" max="365" />
+              <span class="threshold-unit">days</span>
+            </div>
+          </div>
+          <div class="threshold-error" id="threshError"></div>
+        </div>
+
+      </section>
+
+      <!-- Card 4: Unit Customization -->
+      <section class="card" id="unitCard">
+        <h2 class="card-title">4. Unit Customization</h2>
+
+        <div class="settings-row" id="unitNameRow">
+          <label class="settings-label" for="unitName">Unit Name</label>
+          <input type="text" id="unitName" class="settings-input" placeholder="e.g. VMFA-314" maxlength="40" />
+        </div>
+
+        <div class="settings-row" style="align-items:flex-start;">
+          <span class="settings-label" style="padding-top:4px;">Emblem</span>
+          <div class="emblem-controls">
+            <label class="btn-secondary emblem-upload-btn" for="emblemInput">&#128247; Upload Image</label>
+            <input type="file" id="emblemInput" accept=".jpg,.jpeg,.png" hidden />
+            <button class="btn-text-sm btn-remove-emblem hidden" id="clearEmblemBtn">Remove</button>
+            <div id="emblemPreview" class="emblem-preview-thumb"></div>
+          </div>
+        </div>
+
+        <!-- Info Text multi-column editor -->
+        <div class="settings-group" style="margin-top:4px;">
+          <div class="settings-group-label">Header Information Text</div>
+          <div class="settings-row" style="margin-bottom:8px;">
+            <label class="settings-label" for="infoColCount">Columns</label>
+            <select id="infoColCount" class="settings-select">
+              <option value="1">1 Column</option>
+              <option value="2">2 Columns</option>
+              <option value="3" selected>3 Columns</option>
+            </select>
+          </div>
+          <div id="infoColContainer" class="info-col-container"></div>
+        </div>
+
+      </section>
+
+      <!-- Card 5: Projection Date -->
+      <section class="card" id="projectionCard">
+        <h2 class="card-title">5. Projection Date</h2>
+        <input type="date" id="projectionDate" class="settings-date" />
+        <p class="projection-hint">Personnel due on or before this date will appear on the hit list.</p>
+      </section>
+
+      </div><!-- end .settings-scroll -->
+
+      <!-- Sticky footer — always visible -->
+      <div class="settings-footer">
+
+        <!-- Generate -->
+        <button class="btn-generate" id="generateBtn" disabled>Generate Hit List</button>
+        <div class="generate-block-msg hidden" id="generateBlockMsg">
+          ⚠ Fix warning window settings to continue
+        </div>
+
+        <!-- Column counter -->
+        <div class="column-counter" id="columnCounter">
+          <span id="columnLabel">Estimated columns: </span><span id="columnCount">--</span>
+        </div>
+
+        <!-- Settings persistence -->
+        <div class="settings-actions" id="settingsActions">
+          <button class="btn-secondary" id="exportSettingsBtn">&#8593; Export Settings</button>
+          <label class="btn-secondary" for="importSettingsInput">&#8595; Import Settings</label>
+          <input type="file" id="importSettingsInput" accept=".json" hidden />
+        </div>
+
+      </div><!-- end .settings-footer -->
+
+    </aside>
+
+    <!-- ── RIGHT PANEL: Preview ───────────────────────────── -->
+    <section class="preview-panel" id="previewPanel">
+      <div class="preview-placeholder" id="previewPlaceholder">
+        <div class="preview-placeholder-icon">&#128203;</div>
+        <p>Your hit list will appear here after uploading a MRRS file and clicking <strong>Generate Hit List</strong>.</p>
+      </div>
+      <div class="report-output" id="reportOutput"></div>
+    </section>
+
+  </main>
+
+  <!-- Print-only output area -->
+  <div class="print-only" id="printOutput"></div>
+
+  <!-- Export bar -->
+  <div class="export-bar" id="exportBar" hidden>
+    <span class="export-hint" id="exportHint">In the print dialog, set Destination to &#8220;Save as PDF&#8221;</span>
+    <button class="btn-export" id="exportPdfBtn">&#128438; Export PDF</button>
+    <button class="btn-export btn-export-officer hidden" id="exportPdfOfficerBtn">&#128438; Export Officer PDF</button>
+    <div class="btn-divider hidden" id="exportBtnDivider"></div>
+    <button class="btn-export btn-export-enlisted hidden" id="exportPdfEnlistedBtn">&#128438; Export Enlisted PDF</button>
+  </div>
+
+  <!-- Floating tooltip element -->
+  <div class="floating-tip" id="floatingTip"></div>
+
+  <!-- ── Feedback Modal ──────────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="feedbackOverlay">
+    <div class="modal-box feedback-box">
+
+      <div class="modal-header">
+        <div class="modal-lock">💬</div>
+        <div class="modal-header-text">
+          <div class="modal-title">Send Feedback</div>
+          <div class="modal-subtitle">Help improve Hitlist Hatcher</div>
+        </div>
+        <button class="feedback-close-btn" id="feedbackClose" aria-label="Close">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="feedback-section-label">Category</div>
+        <div class="feedback-categories" id="feedbackCategories">
+          <button class="cat-pill selected" data-cat="bug">🐛 Bug Report</button>
+          <button class="cat-pill" data-cat="feature">✨ Feature Request</button>
+          <button class="cat-pill" data-cat="app-idea">💡 New App Idea</button>
+          <button class="cat-pill" data-cat="other">💬 Other</button>
+        </div>
+
+        <div class="feedback-section-label" style="margin-top:14px;">Description</div>
+        <div class="feedback-textarea-wrap">
+          <textarea id="feedbackText" class="settings-textarea feedback-textarea"
+            rows="5" maxlength="2000"
+            placeholder="Describe the bug, feature, or idea…"></textarea>
+          <div class="feedback-char-wrap">
+            <span id="feedbackCharCount">0</span>/2000
+          </div>
+        </div>
+
+        <div class="feedback-section-label" style="margin-top:14px;">Reply-to Email <span class="feedback-optional">(optional)</span></div>
+        <input type="email" id="feedbackEmail" class="settings-input feedback-email"
+          placeholder="your.email@example.com" />
+        <div class="feedback-email-hint" id="feedbackEmailHint">Leave blank to submit anonymously.</div>
+      </div>
+
+      <div class="modal-footer">
+        <div class="feedback-privacy" id="feedbackPrivacy">🔒 Submitted anonymously</div>
+        <button class="btn-modal-accept" id="feedbackSubmit">Send Feedback</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Walkthrough Spotlight ───────────────────────────────── -->
+  <div class="wt-spotlight hidden" id="wtSpotlight"></div>
+
+  <!-- ── Walkthrough Welcome Screen ─────────────────────────── -->
+  <div class="wt-overlay hidden" id="wtWelcomeOverlay">
+    <div class="wt-welcome-box">
+      <div class="wt-welcome-icon">🗺️</div>
+      <h2 class="wt-welcome-title">Welcome to Hitlist Hatcher 3.0</h2>
+      <p class="wt-welcome-desc">
+        A quick tour will show you how to upload your MRRS file, configure your
+        report settings, and export a ready-to-brief hit list — in about 2 minutes.
+      </p>
+      <div class="wt-welcome-actions">
+        <button class="btn-modal-accept" id="wtBtnStart">Start Tour →</button>
+        <button class="btn-wt-ghost" onclick="document.getElementById('wtWelcomeOverlay').classList.add('hidden')">Skip for now</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Walkthrough Step Callout ────────────────────────────── -->
+  <div class="wt-callout hidden" id="wtCallout">
+    <div class="wt-callout-header">
+      <span class="wt-step-badge" id="wtStepBadge">Step 1</span>
+      <div class="wt-progress-bar"><div class="wt-progress-fill" id="wtProgressFill"></div></div>
+      <span class="wt-step-of" id="wtStepOf">1 of 17</span>
+    </div>
+    <h3 class="wt-callout-title" id="wtTitle"></h3>
+    <div class="wt-callout-desc" id="wtDesc"></div>
+    <div class="wt-callout-tip hidden" id="wtTip"></div>
+    <div class="wt-callout-footer">
+      <button class="btn-wt-ghost" id="wtBtnSkip">Skip Tour</button>
+      <div class="wt-nav-btns">
+        <button class="btn-wt-nav" id="wtBtnPrev">← Back</button>
+        <button class="btn-wt-primary" id="wtBtnNext">Next →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Walkthrough Done Screen ─────────────────────────────── -->
+  <div class="wt-overlay hidden" id="wtDoneOverlay">
+    <div class="wt-welcome-box">
+      <div class="wt-welcome-icon">✅</div>
+      <h2 class="wt-welcome-title">You're all set!</h2>
+      <p class="wt-welcome-desc">
+        Upload your MRRS file and click <strong>Generate Hit List</strong> to
+        create your first report. The <strong>❓ Tutorial</strong> button in the
+        top-right corner will bring this tour back any time.
+      </p>
+      <div class="wt-done-remember">
+        <label class="modal-remember">
+          <input type="checkbox" id="wtDontShow" />
+          Don't show this tour automatically again
+        </label>
+      </div>
+      <div class="wt-welcome-actions">
+        <button class="btn-modal-accept" id="wtBtnDone">Get Started</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+
+</body>
+</html>
