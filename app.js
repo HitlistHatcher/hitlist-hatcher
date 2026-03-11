@@ -16,6 +16,14 @@ const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
 
+// ── MRRS format validation ──
+// Rows 0–1 are expected to contain FOUO / Privacy Act warning text.
+// Row 2 (MRRS_HEADER_ROW) contains column headers.
+// Update these if MRRS changes their export format.
+const MRRS_FOUO_KEYWORDS     = ['FOUO', 'Privacy Act'];
+const MRRS_SIGNATURE_COLUMNS = ['Name', 'Rank/Rate', 'IMR Status', 'PHA Due', 'Dental Exam Due', 'Off Enl Indicator'];
+const MRRS_FORMAT_ERROR       = '✗ This file doesn\'t match the expected MRRS format. Hitlist Hatcher requires the IMR Detail report.\n\nIn MRRS: Reports → IMR → Force → IMR, then export the Details view as Excel.';
+
 const COL = {
   NAME:'Name', RANK:'Rank/Rate', COMP_DEPT:'Comp/Dept', PLATOON:'Platoon',
   OFF_ENL:'Off Enl Indicator', SEX:'Sex', IMR_STATUS:'IMR Status', DEPLOYING:'Deploying',
@@ -66,6 +74,7 @@ const DISCLAIMER_KEY   = 'hitlistHatcher_disclaimerSeen';
 const WALKTHROUGH_KEY  = 'hitlistHatcher_walkthroughSeen';
 const COL_WARN_YELLOW  = 12;
 const COL_WARN_RED     = 14;
+const EMBLEM_MAX_BYTES = 153600;  // 150KB raw file size limit
 const DEBOUNCE_MS      = 400;
 
 const IMMUNIZATION_KEYS = [
@@ -151,6 +160,7 @@ const dom = {
   emblemInput:         document.getElementById('emblemInput'),
   clearEmblemBtn:      document.getElementById('clearEmblemBtn'),
   emblemPreview:       document.getElementById('emblemPreview'),
+  emblemError:         document.getElementById('emblemError'),
   infoColCount:        document.getElementById('infoColCount'),
   infoColContainer:    document.getElementById('infoColContainer'),
   projectionDate:      document.getElementById('projectionDate'),
@@ -756,7 +766,7 @@ function wtInjectSampleReport() {
       </tr></thead>
       <tbody>
         <tr>
-          <td class="col-name">ANDERSON JAMES</td>
+          <td class="col-name">Anderson James</td>
           <td class="col-rank">SGT</td>
           <td class="col-item status-red">${fmt(relDate(-12))}</td>
           <td class="col-item cell-na">—</td>
@@ -764,7 +774,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
-          <td class="col-name">CHEN MEI</td>
+          <td class="col-name">Chen Mei</td>
           <td class="col-rank">CPL</td>
           <td class="col-item cell-na">—</td>
           <td class="col-item status-yellow">${fmt(relDate(4))}</td>
@@ -772,7 +782,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
-          <td class="col-name">DAVIS ROBERT</td>
+          <td class="col-name">Davis Robert</td>
           <td class="col-rank">SSGT</td>
           <td class="col-item cell-na">—</td>
           <td class="col-item cell-na">—</td>
@@ -780,7 +790,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
-          <td class="col-name">GARCIA ELENA</td>
+          <td class="col-name">Garcia Elena</td>
           <td class="col-rank">LCPL</td>
           <td class="col-item">${fmt(relDate(40))}</td>
           <td class="col-item cell-na">—</td>
@@ -788,7 +798,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
-          <td class="col-name">KIM JASON</td>
+          <td class="col-name">Kim Jason</td>
           <td class="col-rank">CPL</td>
           <td class="col-item cell-na">—</td>
           <td class="col-item cell-na">—</td>
@@ -796,7 +806,7 @@ function wtInjectSampleReport() {
           <td class="col-item status-green"><div class="imm-grouped" data-tooltip="${immJson}">2 due</div></td>
         </tr>
         <tr>
-          <td class="col-name">MILLER SARAH</td>
+          <td class="col-name">Miller Sarah</td>
           <td class="col-rank">SGT</td>
           <td class="col-item status-red">${fmt(relDate(-3))}</td>
           <td class="col-item status-red">${fmt(relDate(-30))}</td>
@@ -831,7 +841,12 @@ window.addEventListener('resize', () => {
 /* ── 5. FILE UPLOAD ────────────────────────────────────────── */
 
 function wireUploadHandlers() {
-  dom.uploadArea.addEventListener('click', () => dom.fileInput.click());
+  dom.uploadArea.addEventListener('click', e => {
+    // Prevent double file dialog: the <label for="fileInput"> natively opens the
+    // picker, so skip the programmatic .click() when the label or input is clicked.
+    if(e.target === dom.fileInput || e.target.closest('label[for="fileInput"]')) return;
+    dom.fileInput.click();
+  });
   dom.fileInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
   dom.uploadArea.addEventListener('dragover', e => { e.preventDefault(); dom.uploadArea.classList.add('drag-over'); });
   dom.uploadArea.addEventListener('dragleave', () => dom.uploadArea.classList.remove('drag-over'));
@@ -851,9 +866,12 @@ function handleFile(file) {
   reader.onload = e => {
     try {
       const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true,raw:false});
-      if (!wb.SheetNames.includes(MRRS_SHEET_NAME)) {
-        setUploadStatus('error',`✗ Sheet "${MRRS_SHEET_NAME}" not found.`);
-        dom.uploadArea.classList.add('upload-error'); dom.uploadArea.classList.remove('upload-success'); return;
+      const formatCheck = validateMrrsFormat(wb);
+      if(!formatCheck.valid){
+        setUploadStatus('error', MRRS_FORMAT_ERROR);
+        dom.uploadArea.classList.add('upload-error'); dom.uploadArea.classList.remove('upload-success');
+        console.warn('MRRS format validation failed:', formatCheck.reason);
+        return;
       }
       state.rawData = wb;
       const parsed  = parseMRRS(wb, false);
@@ -868,6 +886,7 @@ function handleFile(file) {
       dom.generateBtn.disabled = false;
       updateGenerateBtnState();
       logParseResults(parsed);
+      refreshColumnCounter();
     } catch(err) {
       console.error('File read error:',err);
       setUploadStatus('error','✗ Could not read file.'); dom.uploadArea.classList.add('upload-error');
@@ -884,6 +903,28 @@ function setUploadStatus(type,message) {
 
 
 /* ── 6. MRRS PARSER ────────────────────────────────────────── */
+
+// Validates that the uploaded workbook matches the expected MRRS IMR Detail format.
+// Returns { valid:true } or { valid:false, reason:string }.
+function validateMrrsFormat(workbook) {
+  const sheet = workbook.Sheets[MRRS_SHEET_NAME];
+  if(!sheet) return { valid:false, reason:`Sheet "${MRRS_SHEET_NAME}" not found.` };
+
+  const rows = XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+
+  // Step A: Check that the first two rows contain FOUO / Privacy Act warning text
+  const topCells = [].concat(rows[0]||[], rows[1]||[]);
+  const topText  = topCells.join(' ');
+  const hasFouo  = MRRS_FOUO_KEYWORDS.some(kw => topText.toUpperCase().includes(kw.toUpperCase()));
+  if(!hasFouo) return { valid:false, reason:'Expected FOUO/Privacy Act warning in rows 1–2.' };
+
+  // Step B: Check that signature columns exist in the header row
+  const headerRow = (rows[MRRS_HEADER_ROW]||[]).map(v => String(v).trim());
+  const missing = MRRS_SIGNATURE_COLUMNS.filter(col => !headerRow.includes(col));
+  if(missing.length) return { valid:false, reason:`Missing expected columns: ${missing.join(', ')}` };
+
+  return { valid:true };
+}
 
 function parseMRRS(workbook, useMrrsDate) {
   const sheet = workbook.Sheets[MRRS_SHEET_NAME];
@@ -1439,7 +1480,7 @@ function buildTable(results, colDefs, settings){
 function getCellHTML(result, col, settings){
   const {key, type, vaccKey} = col;
   if(type === 'identity'){
-    if(key === 'name')    return`<td class="col-name">${escHtml(result.person.name)}</td>`;
+    if(key === 'name')    return`<td class="col-name">${escHtml(toTitleCase(result.person.name))}</td>`;
     if(key === 'rank')    return`<td class="col-rank">${escHtml(result.person.rank)}</td>`;
     if(key === 'section') return`<td class="col-section">${escHtml(result.person.section)}</td>`;
   }
@@ -1644,27 +1685,36 @@ function initSettingsPanel(){
   // Emblem upload
   dom.emblemInput.addEventListener('change',e=>{
     const file=e.target.files[0]; if(!file) return;
+    dom.emblemError.classList.add('hidden');
+    if(file.size > EMBLEM_MAX_BYTES){
+      dom.emblemError.textContent = `Image too large (${formatBytes(file.size)}). Please use a file under 150 KB.`;
+      dom.emblemError.classList.remove('hidden');
+      dom.emblemInput.value='';
+      return;
+    }
     const reader=new FileReader();
     reader.onload=ev=>{
       state.emblemBase64=ev.target.result;
       dom.emblemPreview.style.backgroundImage=`url('${ev.target.result}')`;
       dom.emblemPreview.classList.add('has-image'); dom.clearEmblemBtn.classList.remove('hidden');
       onSettingsChanged();
+      liveUpdateEmblem();
     };
     reader.readAsDataURL(file);
   });
   dom.clearEmblemBtn.addEventListener('click',()=>{
     state.emblemBase64=null; dom.emblemPreview.style.backgroundImage='';
     dom.emblemPreview.classList.remove('has-image'); dom.clearEmblemBtn.classList.add('hidden');
-    dom.emblemInput.value='';
+    dom.emblemInput.value=''; dom.emblemError.classList.add('hidden');
     onSettingsChanged();
+    liveUpdateEmblem();
   });
 
   // Dental date radio
   document.querySelectorAll('input[name="dentalDate"]').forEach(r=>r.addEventListener('change',onSettingsChanged));
 
   // Text inputs
-  dom.unitName.addEventListener('input',debounce(onSettingsChanged,DEBOUNCE_MS));
+  dom.unitName.addEventListener('input',debounce(()=>{ onSettingsChanged(); liveUpdateUnitName(); },DEBOUNCE_MS));
 
   // Info column builder
   initInfoColumns();
@@ -1735,6 +1785,38 @@ function liveUpdateInfoBar() {
   });
   // saveSettings() is called by the textarea/select listeners directly so
   // saving is never gated on reportGenerated state.
+}
+
+// Instantly refreshes the unit name in the report header without re-generating.
+function liveUpdateUnitName() {
+  if(!state.reportGenerated) return;
+  const name = dom.unitName.value.trim() || 'Unit Name';
+  document.querySelectorAll('.hitlist-unit-name').forEach(el => {
+    el.textContent = `${name} Medical Hit List`;
+  });
+}
+
+// Instantly refreshes the emblem in the report header without re-generating.
+function liveUpdateEmblem() {
+  if(!state.reportGenerated) return;
+  const src = state.emblemBase64;
+  document.querySelectorAll('.hitlist-header-top').forEach(top => {
+    // Replace all emblem elements (img or placeholder divs) within the header-top
+    top.querySelectorAll('.hitlist-emblem, .hitlist-emblem-placeholder').forEach(el => {
+      if(src) {
+        const img = document.createElement('img');
+        img.className = 'hitlist-emblem';
+        img.src = src;
+        img.alt = 'Unit Emblem';
+        el.replaceWith(img);
+      } else {
+        const div = document.createElement('div');
+        div.className = 'hitlist-emblem-placeholder';
+        div.innerHTML = 'Unit<br/>Emblem';
+        el.replaceWith(div);
+      }
+    });
+  });
 }
 
 function getInfoColumns(){
@@ -2273,4 +2355,43 @@ function updateColumnCounter(count, exact){
   dom.columnCounter.classList.remove('warn-yellow','warn-red');
   if(count>=COL_WARN_RED)    dom.columnCounter.classList.add('warn-red');
   else if(count>=COL_WARN_YELLOW) dom.columnCounter.classList.add('warn-yellow');
+}
+
+// Display-only title case transform for MRRS names.
+// MRRS format: "LAST FIRST [MI] [SUFFIX]" — all uppercase.
+// Rules:
+//   - Suffixes (JR, SR, II, III, IV, V) → keep uppercase
+//   - Single-letter tokens (middle initials) → keep uppercase
+//   - Mc prefix (3+ chars after Mc) → McDonald, McAteer, etc.
+//   - Apostrophes → O'Brien  Hyphens → Smith-Jones
+//   - Everything else → first letter up, rest lower
+const TITLE_CASE_SUFFIXES = new Set(['JR','SR','II','III','IV','V']);
+
+function toTitleCase(name) {
+  if(!name) return '';
+  return name.split(' ').map(token => {
+    const upper = token.toUpperCase();
+    // Preserve suffixes
+    if(TITLE_CASE_SUFFIXES.has(upper)) return upper;
+    // Preserve single-letter tokens (middle initials)
+    if(token.length === 1) return upper;
+    // Apply title case to a single word segment (handles hyphens and apostrophes)
+    return titleCaseWord(token);
+  }).join(' ');
+}
+
+function titleCaseWord(word) {
+  // Handle hyphens: split, capitalize each part, rejoin
+  if(word.includes('-')) return word.split('-').map(titleCaseWord).join('-');
+  // Handle apostrophes: O'BRIEN → O'Brien
+  const apos = word.indexOf("'");
+  if(apos > 0 && apos < word.length - 1) {
+    return titleCaseWord(word.slice(0, apos)) + "'" + titleCaseWord(word.slice(apos + 1));
+  }
+  // Mc prefix: MCDONALD → McDonald (only if 3+ chars follow Mc)
+  if(word.length >= 5 && word.slice(0,2).toUpperCase() === 'MC') {
+    return 'Mc' + word.charAt(2).toUpperCase() + word.slice(3).toLowerCase();
+  }
+  // Default: first letter uppercase, rest lowercase
+  return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
 }

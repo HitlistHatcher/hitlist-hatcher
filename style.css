@@ -271,7 +271,7 @@ html, body {
 }
 
 .upload-status.success { color: var(--green); }
-.upload-status.error   { color: var(--red); }
+.upload-status.error   { color: var(--red); white-space: pre-line; }
 
 
 /* ── 6. BUTTONS ────────────────────────────────────────────── */
@@ -1026,6 +1026,14 @@ html, body {
   background-color: var(--gray-50);
 }
 .emblem-preview-thumb.has-image { border-color: var(--navy-light); }
+
+.emblem-error {
+  width: 100%;
+  font-size: 11.5px;
+  color: #b91c1c;
+  margin-top: 2px;
+  line-height: 1.4;
+}
 
 .projection-hint {
   font-size: 11px;

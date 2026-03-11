@@ -180,7 +180,8 @@
           <div class="tst-sub hidden" id="tstSub">
             <label class="cb-label">
               <input type="checkbox" id="item-tstCombine" />
-              ⛓ Combine into one column
+              Combine TST into single column
+              <span class="tip" data-tip-title="Combine TST Column" data-tip-body="&lt;p&gt;When both &lt;strong&gt;TST Due&lt;/strong&gt; and &lt;strong&gt;TST Questionnaire&lt;/strong&gt; are selected, this option merges them into a single column.&lt;/p&gt;&lt;p&gt;The cell shows the most urgent due date. Hover over it in the browser preview to see both items and their individual dates.&lt;/p&gt;">💡</span>
             </label>
           </div>
           <label class="cb-label">
@@ -259,6 +260,7 @@
             <input type="file" id="emblemInput" accept=".jpg,.jpeg,.png" hidden />
             <button class="btn-text-sm btn-remove-emblem hidden" id="clearEmblemBtn">Remove</button>
             <div id="emblemPreview" class="emblem-preview-thumb"></div>
+            <div class="emblem-error hidden" id="emblemError"></div>
           </div>
         </div>
 
