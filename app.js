@@ -22,7 +22,7 @@ const MRRS_SHEET_NAME = 'IMR Detail';
 // Update these if MRRS changes their export format.
 const MRRS_FOUO_KEYWORDS     = ['FOUO', 'Privacy Act'];
 const MRRS_SIGNATURE_COLUMNS = ['Name', 'Rank/Rate', 'IMR Status', 'PHA Due', 'Dental Exam Due', 'Off Enl Indicator'];
-const MRRS_FORMAT_ERROR       = '✗ This file doesn\'t match the expected MRRS format. Hitlist Hatcher requires the IMR Detail report.\n\nIn MRRS: Reports → IMR → Force → IMR, then export the Details view as Excel.';
+const MRRS_FORMAT_ERROR       = '✗ This file doesn\'t match the expected MRRS format. Hitlist Hatcher requires the Excel IMR Report (Details) report.\n\nIn MRRS: Reports → IMR → Force → IMR, under Report Title select Excel IMR Report (Details), within Unit select your command, then click Run.';
 
 const COL = {
   NAME:'Name', RANK:'Rank/Rate', COMP_DEPT:'Comp/Dept', PLATOON:'Platoon',
@@ -102,6 +102,63 @@ const IMMUNIZATION_LABELS = {
 };
 
 
+/* ── 1b. ERROR CAPTURE ─────────────────────────────────────── */
+
+const errorLog = [];
+const MAX_ERROR_LOG = 10;
+
+// Add an error entry. Deduplicates by type+message — if the last entry
+// matches, its count is incremented instead of adding a duplicate.
+function captureError(entry) {
+  entry.timestamp = new Date().toISOString();
+  entry.appVersion = APP_VERSION;
+  const last = errorLog.length ? errorLog[errorLog.length - 1] : null;
+  if (last && last.type === entry.type && last.message === entry.message) {
+    last.count = (last.count || 1) + 1;
+    last.timestamp = entry.timestamp; // update to latest occurrence
+    return;
+  }
+  entry.count = 1;
+  if (errorLog.length >= MAX_ERROR_LOG) errorLog.shift();
+  errorLog.push(entry);
+}
+
+// Build a diagnostics snapshot for feedback submissions.
+// No PII — only structural/environment info.
+function getErrorReport() {
+  return {
+    appVersion: APP_VERSION,
+    browser: navigator.userAgent,
+    screen: `${screen.width}x${screen.height}`,
+    viewport: `${window.innerWidth}x${window.innerHeight}`,
+    personnelLoaded: state.personnel.length,
+    reportGenerated: state.reportGenerated,
+    immMode: state.immDisplayMode,
+    errors: errorLog.slice(-10),
+  };
+}
+
+window.onerror = function(message, source, lineno, colno, error) {
+  captureError({
+    type: 'uncaught',
+    message: String(message),
+    source: source || '',
+    line: lineno,
+    col: colno,
+    stack: error?.stack || '',
+  });
+  return false;
+};
+
+window.addEventListener('unhandledrejection', function(e) {
+  captureError({
+    type: 'unhandled-promise',
+    message: String(e.reason),
+    stack: e.reason?.stack || '',
+  });
+});
+
+
 /* ── 2. STATE ──────────────────────────────────────────────── */
 
 const state = {
@@ -109,6 +166,7 @@ const state = {
   filteredResults:[], currentStats:{}, settings:{},
   reportGenerated:false, emblemBase64:null,
   immDisplayMode:'grouped', _lastDentalFlag:false,
+  errorReportPending:false,
 };
 
 
@@ -194,6 +252,12 @@ const dom = {
   feedbackPrivacy:     document.getElementById('feedbackPrivacy'),
   feedbackEmailHint:   document.getElementById('feedbackEmailHint'),
   feedbackSubmit:      document.getElementById('feedbackSubmit'),
+  // Error bar
+  errorBar:            document.getElementById('errorBar'),
+  // Feedback diagnostics
+  feedbackDiagBanner:  document.getElementById('feedbackDiagBanner'),
+  feedbackDiagDetails: document.getElementById('feedbackDiagDetails'),
+  feedbackDiagPre:     document.getElementById('feedbackDiagPre'),
   // About modal
   versionBadge:        document.getElementById('versionBadge'),
   aboutModal:          document.getElementById('aboutModal'),
@@ -300,13 +364,75 @@ function wireTooltips() {
 }
 
 
-/* ── 4c. FEEDBACK MODAL ────────────────────────────────────── */
+/* ── 4c. ERROR NOTIFICATION BAR ───────────────────────────── */
+
+const ERROR_BAR_TITLES = {
+  'generate': 'Report generation failed',
+  'export':   'PDF export failed',
+};
+
+function showErrorBar(errorType) {
+  if(!dom.errorBar) return;
+  const title = ERROR_BAR_TITLES[errorType] || 'An error occurred';
+  document.getElementById('errorBarTitle').textContent = title;
+  dom.errorBar.classList.remove('hidden');
+
+  // Wire buttons (clone to avoid duplicate listeners)
+  const reportBtn  = document.getElementById('errorBarReport');
+  const dismissBtn = document.getElementById('errorBarDismiss');
+  const closeBtn   = document.getElementById('errorBarClose');
+  const newReport  = reportBtn.cloneNode(true);
+  const newDismiss = dismissBtn.cloneNode(true);
+  const newClose   = closeBtn.cloneNode(true);
+  reportBtn.replaceWith(newReport);
+  dismissBtn.replaceWith(newDismiss);
+  closeBtn.replaceWith(newClose);
+
+  newReport.addEventListener('click', reportBugFromError);
+  newDismiss.addEventListener('click', dismissErrorBar);
+  newClose.addEventListener('click', dismissErrorBar);
+}
+
+function dismissErrorBar() {
+  if(dom.errorBar) dom.errorBar.classList.add('hidden');
+}
+
+function reportBugFromError() {
+  dismissErrorBar();
+  state.errorReportPending = true;
+  openFeedbackWithDiagnostics();
+}
+
+function openFeedbackWithDiagnostics() {
+  if(!dom.feedbackOverlay) return;
+  // Pre-select Bug Report category
+  dom.feedbackCategories.querySelectorAll('.cat-pill').forEach(p =>
+    p.classList.toggle('selected', p.dataset.cat === 'bug'));
+  // Show diagnostics banner
+  if(dom.feedbackDiagBanner) dom.feedbackDiagBanner.classList.remove('hidden');
+  // Populate and show diagnostics details
+  if(dom.feedbackDiagDetails && dom.feedbackDiagPre) {
+    dom.feedbackDiagPre.textContent = JSON.stringify(getErrorReport(), null, 2);
+    dom.feedbackDiagDetails.classList.remove('hidden');
+  }
+  // Update placeholder and footer
+  dom.feedbackText.placeholder = 'What were you doing when the error occurred? (e.g., "I clicked Generate Hit List with 12 immunizations selected in Individual mode")';
+  dom.feedbackPrivacy.textContent = '🔧 Error diagnostics attached';
+  // Open
+  dom.feedbackOverlay.classList.remove('hidden');
+}
+
+
+/* ── 4d. FEEDBACK MODAL ───────────────────────────────────── */
 
 function initFeedbackModal() {
   if(!dom.feedbackBtn) return;
 
   // Open / close
-  dom.feedbackBtn.addEventListener('click', () => dom.feedbackOverlay.classList.remove('hidden'));
+  dom.feedbackBtn.addEventListener('click', () => {
+    clearDiagnosticsUI();
+    dom.feedbackOverlay.classList.remove('hidden');
+  });
   dom.feedbackClose.addEventListener('click', closeFeedback);
   dom.feedbackOverlay.addEventListener('click', e => { if(e.target===dom.feedbackOverlay) closeFeedback(); });
 
@@ -330,12 +456,16 @@ function initFeedbackModal() {
       dom.feedbackEmail.classList.add('has-value');
       dom.feedbackEmailHint.textContent = 'A reply will be sent to this address if needed.';
       dom.feedbackEmailHint.classList.add('has-value');
-      dom.feedbackPrivacy.textContent = '📧 Reply to: ' + val;
+      dom.feedbackPrivacy.textContent = state.errorReportPending
+        ? '🔧 Diagnostics attached · 📧 Reply to: ' + val
+        : '📧 Reply to: ' + val;
     } else {
       dom.feedbackEmail.classList.remove('has-value');
       dom.feedbackEmailHint.textContent = 'Leave blank to submit anonymously.';
       dom.feedbackEmailHint.classList.remove('has-value');
-      dom.feedbackPrivacy.textContent = '🔒 Submitted anonymously';
+      dom.feedbackPrivacy.textContent = state.errorReportPending
+        ? '🔧 Error diagnostics attached'
+        : '🔒 Submitted anonymously';
     }
   });
 
@@ -347,11 +477,16 @@ function initFeedbackModal() {
     const email    = dom.feedbackEmail.value.trim();
     dom.feedbackSubmit.textContent = 'Sending…';
     dom.feedbackSubmit.disabled    = true;
+    // Attach diagnostics if error report or any errors have been captured
+    const payload = {category, message:text, _replyto:email||undefined};
+    if(state.errorReportPending || errorLog.length > 0) {
+      payload._diagnostics = JSON.stringify(getErrorReport());
+    }
     try {
       await fetch('https://formspree.io/f/mvzwopqb', {
         method:'POST',
         headers:{'Content-Type':'application/json', 'Accept':'application/json'},
-        body: JSON.stringify({category, message:text, _replyto:email||undefined}),
+        body: JSON.stringify(payload),
       });
       dom.feedbackSubmit.textContent = '✓ Sent!';
       setTimeout(() => { closeFeedback(); resetFeedback(); }, 1200);
@@ -366,6 +501,16 @@ function closeFeedback() {
   dom.feedbackOverlay.classList.add('hidden');
 }
 
+// Clears diagnostics-specific UI without clearing user text/email fields.
+// Called when opening feedback normally (💬 button) and after submit (via resetFeedback).
+function clearDiagnosticsUI() {
+  state.errorReportPending = false;
+  dom.feedbackText.placeholder = 'Describe the bug, feature, or idea…';
+  dom.feedbackPrivacy.textContent = '🔒 Submitted anonymously';
+  if(dom.feedbackDiagBanner)  dom.feedbackDiagBanner.classList.add('hidden');
+  if(dom.feedbackDiagDetails) dom.feedbackDiagDetails.classList.add('hidden');
+}
+
 function resetFeedback() {
   dom.feedbackText.value  = '';
   dom.feedbackEmail.value = '';
@@ -373,10 +518,10 @@ function resetFeedback() {
   dom.feedbackEmail.classList.remove('has-value');
   dom.feedbackEmailHint.textContent = 'Leave blank to submit anonymously.';
   dom.feedbackEmailHint.classList.remove('has-value');
-  dom.feedbackPrivacy.textContent = '🔒 Submitted anonymously';
   dom.feedbackSubmit.textContent  = 'Send Feedback';
   dom.feedbackSubmit.disabled     = false;
   dom.feedbackCategories.querySelectorAll('.cat-pill').forEach((p,i) => p.classList.toggle('selected', i===0));
+  clearDiagnosticsUI();
 }
 
 
@@ -434,7 +579,7 @@ const WT_STEPS = [
   {
     title: 'Upload Your MRRS File',
     desc:  'Start by uploading your <strong>Excel IMR Report (Details)</strong> export from MRRS. Drag and drop your file here, or click to browse. The file never leaves your browser.',
-    tip:   '💡 Only .xlsx and .xls files are accepted. Make sure you export the "IMR Detail" sheet from MRRS.',
+    tip:   '💡 Only .xlsx and .xls files are accepted. In MRRS: Reports → IMR → Force → IMR, under Report Title select Excel IMR Report (Details), within Unit select your command, then click Run.',
     target:'uploadCard',   side:'right', scrollTo:'uploadCard',
   },
   {
@@ -484,6 +629,8 @@ const WT_STEPS = [
   {
     title: 'Save & Restore Settings',
     desc:  '<strong>Export Settings</strong> saves all your current selections — items, thresholds, unit name, and info text — so they can be restored later. <strong>Import Settings</strong> loads a previously saved configuration. Use this to share a standard configuration across your team.',
+    tip:   '❗ Browser data may be cleared without notice, which will erase your saved settings. Export your settings to protect your configuration and make it portable — restore them on any computer or share them across your team for consistent reports.',
+    tipStyle: 'amber',
     target:'settingsActions', side:'right', scrollTo:null,
   },
   {
@@ -612,12 +759,15 @@ function wtShowStep(idx) {
   if(step.tip) {
     dom.wtTip.innerHTML = step.tip;
     dom.wtTip.classList.remove('hidden');
+    dom.wtTip.classList.toggle('wt-callout-tip-amber', step.tipStyle === 'amber');
   } else if(idx === 12 && dom.reportOutput.dataset.wtSample === 'true') {
     // Step 13 (Color Coding) has no static tip — show sample note instead
     dom.wtTip.innerHTML = '💡 Sample report shown for illustration — generate with your MRRS file to see real data.';
     dom.wtTip.classList.remove('hidden');
+    dom.wtTip.classList.remove('wt-callout-tip-amber');
   } else {
     dom.wtTip.classList.add('hidden');
+    dom.wtTip.classList.remove('wt-callout-tip-amber');
   }
 
   dom.wtBtnPrev.disabled    = (idx === 0);
@@ -864,8 +1014,9 @@ function handleFile(file) {
   setUploadStatus('','Reading file…');
   const reader = new FileReader();
   reader.onload = e => {
+    let wb;
     try {
-      const wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true,raw:false});
+      wb = XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true,raw:false});
       const formatCheck = validateMrrsFormat(wb);
       if(!formatCheck.valid){
         setUploadStatus('error', MRRS_FORMAT_ERROR);
@@ -874,7 +1025,7 @@ function handleFile(file) {
         return;
       }
       state.rawData = wb;
-      const parsed  = parseMRRS(wb, false);
+      const parsed  = parseMRRS(wb, false, formatCheck.rows);
       if (!parsed.personnel.length) {
         setUploadStatus('error','✗ No personnel rows found.'); dom.uploadArea.classList.add('upload-error'); return;
       }
@@ -888,6 +1039,16 @@ function handleFile(file) {
       logParseResults(parsed);
       refreshColumnCounter();
     } catch(err) {
+      captureError({
+        type: 'parse-error',
+        message: err.message,
+        stack: err.stack || '',
+        context: {
+          fileName: file.name,
+          fileSize: file.size,
+          sheetsFound: wb ? wb.SheetNames : [],
+        },
+      });
       console.error('File read error:',err);
       setUploadStatus('error','✗ Could not read file.'); dom.uploadArea.classList.add('upload-error');
     }
@@ -923,12 +1084,12 @@ function validateMrrsFormat(workbook) {
   const missing = MRRS_SIGNATURE_COLUMNS.filter(col => !headerRow.includes(col));
   if(missing.length) return { valid:false, reason:`Missing expected columns: ${missing.join(', ')}` };
 
-  return { valid:true };
+  return { valid:true, rows };
 }
 
-function parseMRRS(workbook, useMrrsDate) {
+function parseMRRS(workbook, useMrrsDate, preloadedRows) {
   const sheet = workbook.Sheets[MRRS_SHEET_NAME];
-  const rows  = XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
+  const rows  = preloadedRows || XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
   const headerRow = rows[MRRS_HEADER_ROW]||[];
   const colIndex  = {};
   headerRow.forEach((v,i)=>{ if(v!==null&&v!==undefined&&v!=='') colIndex[String(v).trim()]=i; });
@@ -1922,19 +2083,40 @@ function updateGenerateBtnState() {
 dom.generateBtn.addEventListener('click',()=>{
   if(!state.rawData||!state.personnel.length){alert('Please upload a MRRS file first.');return;}
 
-  const settings = getSettingsFromUI();
-  const today    = new Date();
-  today.setHours(0,0,0,0);
+  try {
+    const settings = getSettingsFromUI();
+    const today    = new Date();
+    today.setHours(0,0,0,0);
 
-  // Re-parse if dental date method changed
-  if(settings.dentalUseMrrsDate !== state._lastDentalFlag){
-    const reparsed = parseMRRS(state.rawData, settings.dentalUseMrrsDate);
-    state.personnel = reparsed.personnel; state._lastDentalFlag = settings.dentalUseMrrsDate;
+    // Re-parse if dental date method changed
+    if(settings.dentalUseMrrsDate !== state._lastDentalFlag){
+      const reparsed = parseMRRS(state.rawData, settings.dentalUseMrrsDate);
+      state.personnel = reparsed.personnel; state._lastDentalFlag = settings.dentalUseMrrsDate;
+    }
+
+    const {results, stats} = applyFilters(state.personnel, settings, today, settings.projectionDate);
+    state.filteredResults = results; state.currentStats = stats;
+    renderReport(results, stats, settings, today, settings.projectionDate);
+  } catch(err) {
+    let context = {};
+    try {
+      context = {
+        personnelCount: state.personnel.length,
+        selectedItems: Object.entries(getSettingsFromUI().items).filter(([k,v])=>v).map(([k])=>k),
+        immMode: state.immDisplayMode,
+        offEnlFilter: dom.offEnlFilter.value,
+        columnCount: dom.columnCount.textContent,
+      };
+    } catch(_) { /* context unavailable */ }
+    captureError({
+      type: 'generate-error',
+      message: err.message,
+      stack: err.stack || '',
+      context,
+    });
+    console.error('Report generation error:', err);
+    showErrorBar('generate');
   }
-
-  const {results, stats} = applyFilters(state.personnel, settings, today, settings.projectionDate);
-  state.filteredResults = results; state.currentStats = stats;
-  renderReport(results, stats, settings, today, settings.projectionDate);
 });
 
 
@@ -2189,121 +2371,138 @@ function exportWrapperAsPdf(wrapperId) {
     : dom.reportOutput.querySelector('.hitlist-wrapper');
   if (!source) return;
 
-  // Clone the full wrapper (original DOM structure) into printOutput
-  dom.printOutput.innerHTML = source.outerHTML;
+  try {
+    // Clone the full wrapper (original DOM structure) into printOutput
+    dom.printOutput.innerHTML = source.outerHTML;
 
-  // ── 1. Measure heights at print dimensions ───────────────────
-  // Temporarily reveal off-screen at the correct print width so that
-  // offsetHeight returns accurate values for header and row elements.
-  dom.printOutput.style.cssText =
-    `display:block;visibility:hidden;position:absolute;` +
-    `top:-99999px;left:0;width:${PRINT_WIDTH_PX}px;`;
+    // ── 1. Measure heights at print dimensions ───────────────────
+    // Temporarily reveal off-screen at the correct print width so that
+    // offsetHeight returns accurate values for header and row elements.
+    dom.printOutput.style.cssText =
+      `display:block;visibility:hidden;position:absolute;` +
+      `top:-99999px;left:0;width:${PRINT_WIDTH_PX}px;`;
 
-  // Apply print font-size overrides inline so measured heights match
-  // what the browser will actually render in @media print.
-  const pName  = dom.printOutput.querySelector('.hitlist-unit-name');
-  const pTitle = dom.printOutput.querySelector('.hitlist-title-line');
-  if (pName)  pName.style.fontSize  = '18px';
-  if (pTitle) pTitle.style.fontSize = '12px';
+    // Apply print font-size overrides inline so measured heights match
+    // what the browser will actually render in @media print.
+    const pName  = dom.printOutput.querySelector('.hitlist-unit-name');
+    const pTitle = dom.printOutput.querySelector('.hitlist-title-line');
+    if (pName)  pName.style.fontSize  = '18px';
+    if (pTitle) pTitle.style.fontSize = '12px';
 
-  const pHeader  = dom.printOutput.querySelector('.hitlist-header');
-  const pLegend  = dom.printOutput.querySelector('.hitlist-legend');
-  const pHeaderH = pHeader ? pHeader.offsetHeight : 0;   // header block only
-  const pLegendH = pLegend ? pLegend.offsetHeight : 0;
-  const headerH  = pHeaderH + pLegendH;                  // combined (for padding/spacers)
+    const pHeader  = dom.printOutput.querySelector('.hitlist-header');
+    const pLegend  = dom.printOutput.querySelector('.hitlist-legend');
+    const pHeaderH = pHeader ? pHeader.offsetHeight : 0;   // header block only
+    const pLegendH = pLegend ? pLegend.offsetHeight : 0;
+    const headerH  = pHeaderH + pLegendH;                  // combined (for padding/spacers)
 
-  // Apply print td/th overrides inline so rowH and colNamesH match actual
-  // print rendering (print CSS: font-size:10px, padding:4px 3px).
-  const allCells = dom.printOutput.querySelectorAll('.hitlist-table td, .hitlist-table th');
-  allCells.forEach(el => {
-    el.style.fontSize = '10px';
-    el.style.padding  = '4px 3px';
-  });
+    // Apply print td/th overrides inline so rowH and colNamesH match actual
+    // print rendering (print CSS: font-size:10px, padding:4px 3px).
+    const allCells = dom.printOutput.querySelectorAll('.hitlist-table td, .hitlist-table th');
+    allCells.forEach(el => {
+      el.style.fontSize = '10px';
+      el.style.padding  = '4px 3px';
+    });
 
-  const colNamesRow = dom.printOutput.querySelector('.hitlist-table thead tr');
-  const colNamesH   = colNamesRow ? colNamesRow.offsetHeight : 22;
+    const colNamesRow = dom.printOutput.querySelector('.hitlist-table thead tr');
+    const colNamesH   = colNamesRow ? colNamesRow.offsetHeight : 22;
 
-  const firstRow = dom.printOutput.querySelector('.hitlist-table tbody tr');
-  const rowH     = Math.max(firstRow ? firstRow.offsetHeight : 20, 1);
+    const firstRow = dom.printOutput.querySelector('.hitlist-table tbody tr');
+    const rowH     = Math.max(firstRow ? firstRow.offsetHeight : 20, 1);
 
-  // Reset measurement state — printOutput returns to display:none via CSS
-  dom.printOutput.style.cssText = '';
-  if (pName)  pName.style.fontSize  = '';
-  if (pTitle) pTitle.style.fontSize = '';
-  allCells.forEach(el => {
-    el.style.fontSize = '';
-    el.style.padding  = '';
-  });
+    // Reset measurement state — printOutput returns to display:none via CSS
+    dom.printOutput.style.cssText = '';
+    if (pName)  pName.style.fontSize  = '';
+    if (pTitle) pTitle.style.fontSize = '';
+    allCells.forEach(el => {
+      el.style.fontSize = '';
+      el.style.padding  = '';
+    });
 
-  // ── 2. Calculate rows per page ───────────────────────────────
-  // Subtract 2 rows as a safety margin against measurement rounding.
-  const P = Math.max(5, Math.floor((PRINT_PAGE_H_PX - headerH - colNamesH) / rowH) - 1);
+    // ── 2. Calculate rows per page ───────────────────────────────
+    // Subtract 2 rows as a safety margin against measurement rounding.
+    const P = Math.max(5, Math.floor((PRINT_PAGE_H_PX - headerH - colNamesH) / rowH) - 1);
 
-  // ── 3. Insert spacer + column-name clone rows into tbody ───────
-  // Before every P-th data row, inject two rows:
-  //   a) A spacer <tr> with break-before:page and height:headerH —
-  //      this forces a new page and reserves the zone the fixed
-  //      header occupies so it doesn't overlap real data.
-  //   b) A clone of the <thead> column-name row — gives each page
-  //      its own visible column headers below the fixed header zone.
-  const tbody      = dom.printOutput.querySelector('.hitlist-table tbody');
-  const colNamesEl = dom.printOutput.querySelector('.hitlist-table thead tr');
-  const rows       = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
+    // ── 3. Insert spacer + column-name clone rows into tbody ───────
+    // Before every P-th data row, inject two rows:
+    //   a) A spacer <tr> with break-before:page and height:headerH —
+    //      this forces a new page and reserves the zone the fixed
+    //      header occupies so it doesn't overlap real data.
+    //   b) A clone of the <thead> column-name row — gives each page
+    //      its own visible column headers below the fixed header zone.
+    const tbody      = dom.printOutput.querySelector('.hitlist-table tbody');
+    const colNamesEl = dom.printOutput.querySelector('.hitlist-table thead tr');
+    const rows       = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
 
-  // Determine insert positions: before rows[P], rows[2P], rows[3P]…
-  const insertAt = [];
-  for (let i = P; i < rows.length; i += P) insertAt.push(i);
+    // Determine insert positions: before rows[P], rows[2P], rows[3P]…
+    const insertAt = [];
+    for (let i = P; i < rows.length; i += P) insertAt.push(i);
 
-  // ── 3a. Insert page-break colClones (pages 2+) ──────────────
-  // Strategy: no separate spacer row. Instead, the colClone itself carries
-  // break-before:page to force the page break, and padding-top:headerH on
-  // each <th> to push the column-name text below the fixed header that
-  // overlays the top of every new page. This avoids the height-mismatch gap
-  // that a separate spacer row introduced.
-  // Insert in reverse order so earlier row indices stay valid.
-  for (let j = insertAt.length - 1; j >= 0; j--) {
-    if (colNamesEl && tbody) {
-      const clone = colNamesEl.cloneNode(true);
-      clone.className = 'print-col-names-repeat print-col-names-pagebreak';
-      tbody.insertBefore(clone, rows[insertAt[j]]);
+    // ── 3a. Insert page-break colClones (pages 2+) ──────────────
+    // Strategy: no separate spacer row. Instead, the colClone itself carries
+    // break-before:page to force the page break, and padding-top:headerH on
+    // each <th> to push the column-name text below the fixed header that
+    // overlays the top of every new page. This avoids the height-mismatch gap
+    // that a separate spacer row introduced.
+    // Insert in reverse order so earlier row indices stay valid.
+    for (let j = insertAt.length - 1; j >= 0; j--) {
+      if (colNamesEl && tbody) {
+        const clone = colNamesEl.cloneNode(true);
+        clone.className = 'print-col-names-repeat print-col-names-pagebreak';
+        tbody.insertBefore(clone, rows[insertAt[j]]);
+      }
     }
-  }
 
-  // ── 3b. Insert page-1 colClone at very start of tbody ───────
-  // <thead> is suppressed in print (injected CSS below) to stop Chrome from
-  // rendering its own unpredictable repetition. This clone replaces it on
-  // page 1. The .hitlist-table-wrapper padding-top already clears the header.
-  if (colNamesEl && tbody) {
-    const firstClone = colNamesEl.cloneNode(true);
-    firstClone.className = 'print-col-names-repeat print-col-names-first';
-    tbody.insertBefore(firstClone, tbody.firstChild);
-  }
+    // ── 3b. Insert page-1 colClone at very start of tbody ───────
+    // <thead> is suppressed in print (injected CSS below) to stop Chrome from
+    // rendering its own unpredictable repetition. This clone replaces it on
+    // page 1. The .hitlist-table-wrapper padding-top already clears the header.
+    if (colNamesEl && tbody) {
+      const firstClone = colNamesEl.cloneNode(true);
+      firstClone.className = 'print-col-names-repeat print-col-names-first';
+      tbody.insertBefore(firstClone, tbody.firstChild);
+    }
 
-  // ── 4. Inject dynamic print styles ──────────────────────────
-  let styleEl = document.getElementById('printHeaderPad');
-  if (!styleEl) {
-    styleEl = document.createElement('style');
-    styleEl.id = 'printHeaderPad';
-    document.head.appendChild(styleEl);
-  }
-  styleEl.textContent =
-    `@media print {
-       /* Page 1: push table below fixed header */
-       .print-only .hitlist-table-wrapper { padding-top: ${headerH}px; }
-       /* Legend: position directly below header block */
-       .print-only .hitlist-legend { top: ${pHeaderH}px; }
-       /* Suppress native <thead> repetition — we own column names via injected rows */
-       .print-only .hitlist-table thead { display: none !important; }
-       /* All column-name clone rows: visible in print */
-       .print-col-names-repeat { display: table-row !important; }
-       .print-col-names-repeat th { font-size: 10px !important; padding: 4px 3px !important; }
-       /* Page-break clones: force page break, then padding-top pushes text
-          below the fixed header — no separate spacer row needed */
-       .print-col-names-pagebreak { break-before: page !important; page-break-before: always !important; }
-       .print-col-names-pagebreak th { padding-top: ${headerH + 4}px !important; }
-     }`;
+    // ── 4. Inject dynamic print styles ──────────────────────────
+    let styleEl = document.getElementById('printHeaderPad');
+    if (!styleEl) {
+      styleEl = document.createElement('style');
+      styleEl.id = 'printHeaderPad';
+      document.head.appendChild(styleEl);
+    }
+    styleEl.textContent =
+      `@media print {
+         /* Page 1: push table below fixed header */
+         .print-only .hitlist-table-wrapper { padding-top: ${headerH}px; }
+         /* Legend: position directly below header block */
+         .print-only .hitlist-legend { top: ${pHeaderH}px; }
+         /* Suppress native <thead> repetition — we own column names via injected rows */
+         .print-only .hitlist-table thead { display: none !important; }
+         /* All column-name clone rows: visible in print */
+         .print-col-names-repeat { display: table-row !important; }
+         .print-col-names-repeat th { font-size: 10px !important; padding: 4px 3px !important; }
+         /* Page-break clones: force page break, then padding-top pushes text
+            below the fixed header — no separate spacer row needed */
+         .print-col-names-pagebreak { break-before: page !important; page-break-before: always !important; }
+         .print-col-names-pagebreak th { padding-top: ${headerH + 4}px !important; }
+       }`;
 
-  window.print();
+    window.print();
+  } catch(err) {
+    captureError({
+      type: 'pdf-export-error',
+      message: err.message,
+      stack: err.stack || '',
+      context: {
+        wrapperId: wrapperId || 'combined',
+        rowCount: source.querySelectorAll('.hitlist-table tbody tr').length,
+        colCount: source.querySelectorAll('.hitlist-table thead th').length,
+        headerFound: !!source.querySelector('.hitlist-header'),
+        legendFound: !!source.querySelector('.hitlist-legend'),
+      },
+    });
+    console.error('PDF export error:', err);
+    showErrorBar('export');
+  }
 }
 
 function wireExportPdfHandler(){

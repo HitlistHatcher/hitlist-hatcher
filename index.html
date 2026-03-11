@@ -84,6 +84,23 @@
     </div>
   </header>
 
+  <!-- ── Error Notification Bar ─────────────────────────────── -->
+  <div class="error-bar hidden" id="errorBar">
+    <div class="error-bar-icon">!</div>
+    <div class="error-bar-body">
+      <div class="error-bar-title" id="errorBarTitle"></div>
+      <div class="error-bar-desc">
+        An unexpected error occurred. Your data is safe — try regenerating the report.
+        If this continues, please send a bug report. Diagnostic details will be attached automatically.
+      </div>
+      <div class="error-bar-actions">
+        <button class="btn-error-report" id="errorBarReport">🐛 Report Bug</button>
+        <button class="btn-error-dismiss" id="errorBarDismiss">Dismiss</button>
+      </div>
+    </div>
+    <button class="btn-error-close" id="errorBarClose" aria-label="Dismiss">✕</button>
+  </div>
+
   <main class="app-layout">
 
     <!-- ── LEFT PANEL: Settings ───────────────────────────── -->
@@ -421,6 +438,11 @@
         <button class="feedback-close-btn" id="feedbackClose" aria-label="Close">✕</button>
       </div>
 
+      <div class="feedback-diag-banner hidden" id="feedbackDiagBanner">
+        <span class="feedback-diag-icon">🔧</span>
+        <span><strong>Error diagnostics will be included automatically</strong> with your submission — no technical details needed from you. Feel free to describe what you were doing when the error occurred, or add any other context that might help.</span>
+      </div>
+
       <div class="modal-body">
         <div class="feedback-section-label">Category</div>
         <div class="feedback-categories" id="feedbackCategories">
@@ -449,6 +471,13 @@
       <div class="modal-footer">
         <div class="feedback-privacy" id="feedbackPrivacy">🔒 Submitted anonymously</div>
         <button class="btn-modal-accept" id="feedbackSubmit">Send Feedback</button>
+      </div>
+
+      <div class="feedback-diag-details hidden" id="feedbackDiagDetails">
+        <details>
+          <summary class="feedback-diag-summary">View attached diagnostics</summary>
+          <pre class="feedback-diag-pre" id="feedbackDiagPre"></pre>
+        </details>
       </div>
 
     </div>
