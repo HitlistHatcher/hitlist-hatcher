@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.0.0';
+const APP_VERSION = '3.1.1';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -63,6 +63,10 @@ const COL = {
   ADENOVIRUS_DUE:'Adenovirus Due',
   PNEUMO_DUE:'Pneumococcal Due',
   HPV_DUE:'HPV Due',
+  MENB_DUE:'MenB Due',
+  SHINGLES_DUE:'Shingles Due',
+  SARSCOV2_DUE:'SARS-CoV-2 Due',
+  ANAM_DUE:'ANAM Due Dt',
 };
 
 const STATUS   = { NA:'NA', OK:'OK', UPCOMING:'UPCOMING', DUE_SOON:'DUE_SOON', OVERDUE:'OVERDUE' };
@@ -79,24 +83,25 @@ const DEBOUNCE_MS      = 400;
 
 const IMMUNIZATION_KEYS = [
   'adenovirus','anthrax','cholera','hepa','hepb','hpv',
-  'influenza','jev','mgc','mmr','pneumo','polio',
-  'rabies','rabiesTiter','smallpox','tdap','twinrix',
-  'typhoid','varicella','yellowFever',
+  'influenza','jev','menb','mgc','mmr','pneumo','polio',
+  'rabies','rabiesTiter','sarscov2','shingles','smallpox',
+  'tdap','twinrix','typhoid','varicella','yellowFever',
 ];
 
 const IMMUNIZATION_DEFAULTS = {
   adenovirus:true, anthrax:true, cholera:true, hepa:true, hepb:true, hpv:true,
-  influenza:true,  jev:true,     mgc:true,     mmr:true,  pneumo:true, polio:true,
-  rabies:true,     rabiesTiter:true, smallpox:true, tdap:true, twinrix:true,
-  typhoid:true,    varicella:true,   yellowFever:true,
+  influenza:true,  jev:true,     menb:true,    mgc:true,  mmr:true,  pneumo:true, polio:true,
+  rabies:true,     rabiesTiter:true, sarscov2:true, shingles:true, smallpox:true,
+  tdap:true, twinrix:true, typhoid:true, varicella:true, yellowFever:true,
 };
 
 const IMMUNIZATION_LABELS = {
   adenovirus:'Adenovirus', anthrax:'Anthrax',     cholera:'Cholera',
   hepa:'Hep A',            hepb:'Hep B',          hpv:'HPV',
-  influenza:'Influenza',   jev:'JEV',             mgc:'MGC',
-  mmr:'MMR',               pneumo:'Pneumococcal', polio:'Polio',
-  rabies:'Rabies',         rabiesTiter:'Rabies Titer', smallpox:'Smallpox',
+  influenza:'Influenza',   jev:'JEV',             menb:'MenB',
+  mgc:'MGC',               mmr:'MMR',             pneumo:'Pneumococcal',
+  polio:'Polio',           rabies:'Rabies',        rabiesTiter:'Rabies Titer',
+  sarscov2:'SARS-CoV-2',   shingles:'Shingles',   smallpox:'Smallpox',
   tdap:'TDap',             twinrix:'TwinRix',     typhoid:'Typhoid',
   varicella:'Varicella',   yellowFever:'Yellow Fever',
 };
@@ -189,6 +194,7 @@ const dom = {
   itemMha2:            document.getElementById('item-mha2'),
   itemMha3:            document.getElementById('item-mha3'),
   itemMha4:            document.getElementById('item-mha4'),
+  itemAnam:            document.getElementById('item-anam'),
   itemVerifyGlasses:   document.getElementById('item-verifyGlasses'),
   itemVerifyInserts:   document.getElementById('item-verifyInserts'),
   itemWarningTag:      document.getElementById('item-warningTag'),
@@ -1188,6 +1194,7 @@ function parseMRRS(workbook, useMrrsDate, preloadedRows) {
       mha2: parseMhaStatus(getCell(row,'MHA2_STATUS')),
       mha3: parseMhaStatus(getCell(row,'MHA3_STATUS')),
       mha4: parseMhaStatus(getCell(row,'MHA4_STATUS')),
+      anamDue:  parseDate(getCell(row,'ANAM_DUE')),
       warningTagDue: parseDate(getCell(row,'WARNING_TAG_DUE')),
       verifyGlassesDue: parseDate(getCell(row,'VERIFY_GLASSES_DUE')),
       verifyInsertsDue: parseDate(getCell(row,'VERIFY_INSERTS_DUE')),
@@ -1223,6 +1230,9 @@ function parseMRRS(workbook, useMrrsDate, preloadedRows) {
         adenovirus: {due:parseDate(getCell(row,'ADENOVIRUS_DUE')),  label:'Adenovirus'},
         pneumo:     {due:parseDate(getCell(row,'PNEUMO_DUE')),      label:'Pneumococcal'},
         hpv:        {due:parseDate(getCell(row,'HPV_DUE')),         label:'HPV'},
+        menb:       {due:parseDate(getCell(row,'MENB_DUE')),        label:'MenB'},
+        shingles:   {due:parseDate(getCell(row,'SHINGLES_DUE')),    label:'Shingles'},
+        sarscov2:   {due:parseDate(getCell(row,'SARSCOV2_DUE')),    label:'SARS-CoV-2'},
       },
     });
   }
@@ -1333,6 +1343,7 @@ function evaluatePerson(person, settings, today, projDate) {
   const mha2Result          = settings.items.mha2           ? evaluateMHA(person.mha2,                 today, projDate, t) : na;
   const mha3Result          = settings.items.mha3           ? evaluateMHA(person.mha3,                 today, projDate, t) : na;
   const mha4Result          = settings.items.mha4           ? evaluateMHA(person.mha4,                 today, projDate, t) : na;
+  const anamResult          = settings.items.anam           ? evaluateDateItem(person.anamDue,         today, projDate, t) : na;
   const warningTagResult    = settings.items.warningTag     ? evaluateDateItem(person.warningTagDue,   today, projDate, t) : na;
   const verifyGlassesResult = settings.items.verifyGlasses  ? evaluateDateItem(person.verifyGlassesDue,today, projDate, t) : na;
   const verifyInsertsResult = settings.items.verifyInserts   ? evaluateDateItem(person.verifyInsertsDue,today, projDate, t) : na;
@@ -1377,7 +1388,7 @@ function evaluatePerson(person, settings, today, projDate) {
   // isDue: person appears on report if ANY checked item says includeInReport
   const allResults = [
     phaResult, dentalResult, hivResult, audioResult,
-    pdhaResult, pdhraResult, mha2Result, mha3Result, mha4Result,
+    pdhaResult, pdhraResult, mha2Result, mha3Result, mha4Result, anamResult,
     warningTagResult, verifyGlassesResult, verifyInsertsResult,
     bloodTypeResult, refAudioResult, dnaResult, g6pdResult, sickleResult,
     tstResult, tstQuestResult, tstCombinedResult, wellWomanResult,
@@ -1387,7 +1398,7 @@ function evaluatePerson(person, settings, today, projDate) {
   return {person, isDue, items:{
     pha:phaResult, dental:dentalResult, hiv:hivResult, audio:audioResult,
     pdha:pdhaResult, pdhra:pdhraResult,
-    mha2:mha2Result, mha3:mha3Result, mha4:mha4Result,
+    mha2:mha2Result, mha3:mha3Result, mha4:mha4Result, anam:anamResult,
     warningTag:warningTagResult, verifyGlasses:verifyGlassesResult, verifyInserts:verifyInsertsResult,
     bloodType:bloodTypeResult, refAudio:refAudioResult, dna:dnaResult, g6pd:g6pdResult, sickle:sickleResult,
     tst:tstResult, tstQuest:tstQuestResult, tstCombined:tstCombinedResult, wellWoman:wellWomanResult,
@@ -1516,6 +1527,7 @@ function getColumnDefs(settings){
   if(settings.items.mha2)         d.push({key:'mha2',         label:'MHA 2',       type:'item'});
   if(settings.items.mha3)         d.push({key:'mha3',         label:'MHA 3',       type:'item'});
   if(settings.items.mha4)         d.push({key:'mha4',         label:'MHA 4',       type:'item'});
+  if(settings.items.anam)         d.push({key:'anam',         label:'ANAM',        type:'item'});
   if(settings.items.verifyGlasses)d.push({key:'verifyGlasses',label:'Glasses',     type:'item'});
   if(settings.items.verifyInserts)d.push({key:'verifyInserts',label:'Inserts',     type:'item'});
   if(settings.items.warningTag)   d.push({key:'warningTag',   label:'Warn Tag',    type:'item'});
@@ -1747,6 +1759,7 @@ function getDueDateForItem(person, key){
     pha:person.phaDue, dental:person.dentalDue, hiv:person.hivDue, audio:person.audioDue,
     pdha:person.pdhaDue, pdhra:person.pdhraDue,
     mha2:person.mha2?.due||null, mha3:person.mha3?.due||null, mha4:person.mha4?.due||null,
+    anam:person.anamDue,
     warningTag:person.warningTagDue, verifyGlasses:person.verifyGlassesDue, verifyInserts:person.verifyInsertsDue,
     refAudio:person.refAudioDue, dna:person.dnaDue, g6pd:person.g6pdDue, sickle:person.sickleDue,
     tst:person.tstDue, tstQuest:person.tstQuestDue,
@@ -2024,6 +2037,7 @@ function getSettingsFromUI(){
       mha2:          dom.itemMha2.checked,
       mha3:          dom.itemMha3.checked,
       mha4:          dom.itemMha4.checked,
+      anam:          dom.itemAnam.checked,
       warningTag:    dom.itemWarningTag.checked,
       verifyGlasses: dom.itemVerifyGlasses.checked,
       verifyInserts: dom.itemVerifyInserts.checked,
@@ -2142,6 +2156,7 @@ function getDefaultSettings() {
       mha2:          false,
       mha3:          false,
       mha4:          false,
+      anam:          false,
       warningTag:    false,
       verifyGlasses: false,
       verifyInserts: false,
@@ -2220,6 +2235,7 @@ function applySettings(s) {
   dom.itemMha2.checked          = !!items.mha2;
   dom.itemMha3.checked          = !!items.mha3;
   dom.itemMha4.checked          = !!items.mha4;
+  dom.itemAnam.checked          = !!items.anam;
   dom.itemWarningTag.checked    = !!items.warningTag;
   dom.itemVerifyGlasses.checked = !!items.verifyGlasses;
   dom.itemVerifyInserts.checked = !!items.verifyInserts;

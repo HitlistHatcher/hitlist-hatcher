@@ -75,7 +75,7 @@
 
   <header class="app-header">
     <div class="app-header-inner">
-      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.0</span></h1>
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.1</span></h1>
       <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
       <div class="header-pills">
         <button class="btn-pill" id="feedbackBtn">💬 Feedback</button>
@@ -172,6 +172,7 @@
           <label class="cb-label"><input type="checkbox" id="item-mha2" /> MHA 2</label>
           <label class="cb-label"><input type="checkbox" id="item-mha3" /> MHA 3</label>
           <label class="cb-label"><input type="checkbox" id="item-mha4" /> MHA 4</label>
+          <label class="cb-label"><input type="checkbox" id="item-anam" /> ANAM</label>
           <label class="cb-label"><input type="checkbox" id="item-verifyGlasses" /> Verify Glasses</label>
           <label class="cb-label"><input type="checkbox" id="item-verifyInserts" /> Verify Inserts</label>
           <label class="cb-label"><input type="checkbox" id="item-warningTag" /> Verify Warning Tag</label>
@@ -363,7 +364,7 @@
       <div class="modal-header">
         <div class="modal-lock">&#9432;</div>
         <div class="modal-header-text">
-          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.0</span></div>
+          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.1</span></div>
           <div class="modal-subtitle">About &amp; Version History</div>
         </div>
       </div>
@@ -398,6 +399,27 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.1.1</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Added MenB, Shingles, and SARS-CoV-2 immunizations</li>
+            <li>Added ANAM deployment item</li>
+            <li>Updated for latest MRRS export format (265 columns)</li>
+          </ul>
+        </div>
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.1.0</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>MRRS format validation with file structure checking</li>
+            <li>Title case name rendering with Mc- prefix handling</li>
+            <li>Global error capture with inline notification bar</li>
+            <li>Error diagnostics auto-attached to feedback submissions</li>
+            <li>Live-updating unit name, emblem, and info bar</li>
+            <li>Emblem upload size limit (150 KB)</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.0.0</span>
           <span class="about-version-date">MAR 2026</span>
