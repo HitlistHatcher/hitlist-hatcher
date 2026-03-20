@@ -17,10 +17,10 @@ const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
 
 // ── MRRS format validation ──
-// Rows 0–1 are expected to contain FOUO / Privacy Act warning text.
+// Rows 0–1 are expected to contain CUI / unauthorized disclosure warning text.
 // Row 2 (MRRS_HEADER_ROW) contains column headers.
 // Update these if MRRS changes their export format.
-const MRRS_FOUO_KEYWORDS     = ['FOUO', 'Privacy Act'];
+const MRRS_BANNER_KEYWORDS   = ['CONTROLLED UNCLASSIFIED INFORMATION', 'unauthorized disclosure'];
 const MRRS_SIGNATURE_COLUMNS = ['Name', 'Rank/Rate', 'IMR Status', 'PHA Due', 'Dental Exam Due', 'Off Enl Indicator'];
 const MRRS_FORMAT_ERROR       = '✗ This file doesn\'t match the expected MRRS format. Hitlist Hatcher requires the Excel IMR Report (Details) report.\n\nIn MRRS: Reports → IMR → Force → IMR, under Report Title select Excel IMR Report (Details), within Unit select your command, then click Run.';
 
@@ -1079,11 +1079,11 @@ function validateMrrsFormat(workbook) {
 
   const rows = XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
 
-  // Step A: Check that the first two rows contain FOUO / Privacy Act warning text
+  // Step A: Check that the first two rows contain CUI / unauthorized disclosure warning text
   const topCells = [].concat(rows[0]||[], rows[1]||[]);
   const topText  = topCells.join(' ');
-  const hasFouo  = MRRS_FOUO_KEYWORDS.some(kw => topText.toUpperCase().includes(kw.toUpperCase()));
-  if(!hasFouo) return { valid:false, reason:'Expected FOUO/Privacy Act warning in rows 1–2.' };
+  const hasBanner = MRRS_BANNER_KEYWORDS.some(kw => topText.toUpperCase().includes(kw.toUpperCase()));
+  if(!hasBanner) return { valid:false, reason:'Expected CUI/unauthorized disclosure warning in rows 1–2.' };
 
   // Step B: Check that signature columns exist in the header row
   const headerRow = (rows[MRRS_HEADER_ROW]||[]).map(v => String(v).trim());
