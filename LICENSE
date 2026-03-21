@@ -1,0 +1,49 @@
+Copyright (c) 2026 Hitlist Hatcher. All rights reserved.
+
+NOTICE: This software, including all source code, design, logic,
+and associated documentation, is the sole and exclusive
+intellectual property of the author. All rights are reserved.
+
+GRANT OF USE: You are granted a non-exclusive, non-transferable,
+revocable license to use this software in its intended manner —
+running the application in a web browser for the purpose of
+generating medical readiness reports. This grant of use does not
+transfer any ownership, intellectual property rights, or other
+rights not explicitly stated herein.
+
+PROHIBITED USES: Without the express written permission of the
+author, no person or organization may: (1) copy or reproduce
+this software in whole or in part; (2) modify, adapt, or create
+derivative works; (3) distribute, publish, or sublicense this
+software; (4) incorporate any portion of this software into any
+other application, system, or product, including but not limited
+to government information systems; or (5) use this software for
+any commercial purpose.
+
+GOVERNMENT WORK DISCLAIMER: This work was developed solely on
+personal time, using personal equipment and resources, and
+entirely outside the scope of the author's official military
+duties. It does not constitute a work of the United States
+Government under 17 U.S.C. § 105 and is not in the public
+domain.
+
+DISCLAIMER OF WARRANTY: This software is provided "as is"
+without warranty of any kind, express or implied, including but
+not limited to the warranties of merchantability, fitness for a
+particular purpose, and noninfringement. The author makes no
+warranty that the software will be error-free, accurate, or
+uninterrupted.
+
+LIMITATION OF LIABILITY: In no event shall the author be liable
+for any claim, damages, or other liability, whether in an action
+of contract, tort, or otherwise, arising from, out of, or in
+connection with the software or the use or other dealings in the
+software. This includes but is not limited to any errors in
+medical readiness data processing or report generation.
+
+THIRD-PARTY COMPONENTS: This software includes SheetJS Community
+Edition, which is licensed separately under the Apache License
+2.0. See LICENSE-SHEETJS for details.
+
+For licensing, collaboration, or permission requests, contact
+the author directly.
