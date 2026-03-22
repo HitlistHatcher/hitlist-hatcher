@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.2.0';
+const APP_VERSION = '3.3.0';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -105,6 +105,25 @@ const IMMUNIZATION_LABELS = {
   tdap:'TDap',             twinrix:'TwinRix',     typhoid:'Typhoid',
   varicella:'Varicella',   yellowFever:'Yellow Fever',
 };
+
+// ── Default column header labels ──
+// Single source of truth for report column headers. Keys match item keys
+// used in getColumnDefs(). Aliases override these via settings.columnAliases.
+const COLUMN_LABELS = {
+  pha:'PHA', dental:'Dental', hiv:'HIV Lab', audio:'Audiogram',
+  pdha:'PDHA', pdhra:'PDHRA', mha2:'MHA 2', mha3:'MHA 3', mha4:'MHA 4',
+  anam:'ANAM', verifyGlasses:'Glasses', verifyInserts:'Inserts',
+  warningTag:'Warn Tag', bloodType:'Blood Type', refAudio:'Ref Audio',
+  dna:'DNA', g6pd:'G6PD', sickle:'Sickle Cell',
+  tst:'TST', tstQuest:'TST Quest', 'tst-combined':'TST',
+  wellWoman:'Well-Woman', 'imm-grouped':'Immunizations',
+};
+const ALIAS_MAX_LENGTH = 20;
+
+function resolveLabel(key, settings) {
+  const alias = settings.columnAliases && settings.columnAliases[key];
+  return (alias && alias.trim()) || COLUMN_LABELS[key] || key;
+}
 
 
 /* ── 1b. ERROR CAPTURE ─────────────────────────────────────── */
@@ -596,6 +615,12 @@ const WT_STEPS = [
     target:'basicItemsGroup', side:'right', scrollTo:'reportItemsCard',
   },
   {
+    title: 'Rename Column Headers',
+    desc:  'Click the <strong>pencil icon</strong> next to any item to customize its column header on the report. For example, some commands may prefer "Lab" in place of "HIV Lab." Type your custom name, then click <strong>&#10003;</strong> to save or <strong>&#10005;</strong> to discard. You can also press <strong>Enter</strong> to save or <strong>Escape</strong> to discard.',
+    tip:   '💡 Leave the field empty and save to restore the default name. Aliases are saved with your settings and included in settings exports — share a configuration file across your team and everyone gets the same column names.',
+    target:'basicItemsGroup', side:'right', scrollTo:'reportItemsCard',
+  },
+  {
     title: 'Immunization Options',
     desc:  '<strong>Grouped Column</strong> shows a single "Immunizations" cell with a count — hover to see which vaccines are due and their due dates. <strong>Individual Columns</strong> creates one column per vaccine. Watch the column counter when using individual columns.',
     tip:   '💡 Grouped mode is recommended for large units — it keeps the table compact and printable on one page.',
@@ -856,7 +881,7 @@ function wtEnd() {
 // Injected when reaching step 12 with no real report generated.
 // Cleaned up when leaving steps 11-13 backwards or on tour end.
 
-const WT_SAMPLE_STEPS = [11, 12, 13]; // 0-based indices of steps 12-14
+const WT_SAMPLE_STEPS = [12, 13, 14]; // 0-based indices of steps 13-15
 
 function wtInjectSampleReport() {
   if(state.reportGenerated) return;  // real report already present
@@ -1517,38 +1542,38 @@ function getColumnDefs(settings){
   if(settings.showRank)    d.push({key:'rank',   label:'Rank',   type:'identity'});
   if(settings.showSection) d.push({key:'section',label:'Section',type:'identity'});
   // Core
-  if(settings.items.pha)          d.push({key:'pha',          label:'PHA',         type:'item'});
-  if(settings.items.dental)       d.push({key:'dental',       label:'Dental',      type:'item'});
-  if(settings.items.hiv)          d.push({key:'hiv',          label:'HIV Lab',     type:'item'});
-  if(settings.items.audio)        d.push({key:'audio',        label:'Audiogram',   type:'item'});
+  if(settings.items.pha)          d.push({key:'pha',          label:resolveLabel('pha',settings),          type:'item'});
+  if(settings.items.dental)       d.push({key:'dental',       label:resolveLabel('dental',settings),       type:'item'});
+  if(settings.items.hiv)          d.push({key:'hiv',          label:resolveLabel('hiv',settings),          type:'item'});
+  if(settings.items.audio)        d.push({key:'audio',        label:resolveLabel('audio',settings),        type:'item'});
   // Deployment
-  if(settings.items.pdha)         d.push({key:'pdha',         label:'PDHA',        type:'item'});
-  if(settings.items.pdhra)        d.push({key:'pdhra',        label:'PDHRA',       type:'item'});
-  if(settings.items.mha2)         d.push({key:'mha2',         label:'MHA 2',       type:'item'});
-  if(settings.items.mha3)         d.push({key:'mha3',         label:'MHA 3',       type:'item'});
-  if(settings.items.mha4)         d.push({key:'mha4',         label:'MHA 4',       type:'item'});
-  if(settings.items.anam)         d.push({key:'anam',         label:'ANAM',        type:'item'});
-  if(settings.items.verifyGlasses)d.push({key:'verifyGlasses',label:'Glasses',     type:'item'});
-  if(settings.items.verifyInserts)d.push({key:'verifyInserts',label:'Inserts',     type:'item'});
-  if(settings.items.warningTag)   d.push({key:'warningTag',   label:'Warn Tag',    type:'item'});
+  if(settings.items.pdha)         d.push({key:'pdha',         label:resolveLabel('pdha',settings),         type:'item'});
+  if(settings.items.pdhra)        d.push({key:'pdhra',        label:resolveLabel('pdhra',settings),        type:'item'});
+  if(settings.items.mha2)         d.push({key:'mha2',         label:resolveLabel('mha2',settings),         type:'item'});
+  if(settings.items.mha3)         d.push({key:'mha3',         label:resolveLabel('mha3',settings),         type:'item'});
+  if(settings.items.mha4)         d.push({key:'mha4',         label:resolveLabel('mha4',settings),         type:'item'});
+  if(settings.items.anam)         d.push({key:'anam',         label:resolveLabel('anam',settings),         type:'item'});
+  if(settings.items.verifyGlasses)d.push({key:'verifyGlasses',label:resolveLabel('verifyGlasses',settings),type:'item'});
+  if(settings.items.verifyInserts)d.push({key:'verifyInserts',label:resolveLabel('verifyInserts',settings),type:'item'});
+  if(settings.items.warningTag)   d.push({key:'warningTag',   label:resolveLabel('warningTag',settings),   type:'item'});
   // Accessions
-  if(settings.items.bloodType)    d.push({key:'bloodType',    label:'Blood Type',  type:'item'});
-  if(settings.items.refAudio)     d.push({key:'refAudio',     label:'Ref Audio',   type:'item'});
-  if(settings.items.dna)          d.push({key:'dna',          label:'DNA',         type:'item'});
-  if(settings.items.g6pd)         d.push({key:'g6pd',         label:'G6PD',        type:'item'});
-  if(settings.items.sickle)       d.push({key:'sickle',       label:'Sickle Cell', type:'item'});
+  if(settings.items.bloodType)    d.push({key:'bloodType',    label:resolveLabel('bloodType',settings),    type:'item'});
+  if(settings.items.refAudio)     d.push({key:'refAudio',     label:resolveLabel('refAudio',settings),     type:'item'});
+  if(settings.items.dna)          d.push({key:'dna',          label:resolveLabel('dna',settings),          type:'item'});
+  if(settings.items.g6pd)         d.push({key:'g6pd',         label:resolveLabel('g6pd',settings),         type:'item'});
+  if(settings.items.sickle)       d.push({key:'sickle',       label:resolveLabel('sickle',settings),       type:'item'});
   // Other
   if(settings.items.tstCombine) {
-    d.push({key:'tst-combined', label:'TST', type:'tst-combined'});
+    d.push({key:'tst-combined', label:resolveLabel('tst-combined',settings), type:'tst-combined'});
   } else {
-    if(settings.items.tst)      d.push({key:'tst',      label:'TST',       type:'item'});
-    if(settings.items.tstQuest) d.push({key:'tstQuest', label:'TST Quest', type:'item'});
+    if(settings.items.tst)      d.push({key:'tst',      label:resolveLabel('tst',settings),      type:'item'});
+    if(settings.items.tstQuest) d.push({key:'tstQuest', label:resolveLabel('tstQuest',settings), type:'item'});
   }
-  if(settings.items.wellWoman)    d.push({key:'wellWoman',    label:'Well-Woman',  type:'item'});
+  if(settings.items.wellWoman)    d.push({key:'wellWoman',    label:resolveLabel('wellWoman',settings),    type:'item'});
   // Immunizations
   if(settings.items.immunizations){
     if((settings.immunDisplayMode||'grouped')==='grouped'){
-      d.push({key:'imm-grouped',label:'Immunizations',type:'imm-grouped'});
+      d.push({key:'imm-grouped',label:resolveLabel('imm-grouped',settings),type:'imm-grouped'});
     } else {
       (settings.immunizationKeys||[]).forEach(k=>{
         d.push({key:`imm-${k}`,label:IMMUNIZATION_LABELS[k]||k,type:'imm-individual',vaccKey:k});
@@ -1786,6 +1811,34 @@ function escHtml(str){
 
 /* ── 9. SETTINGS PANEL ─────────────────────────────────────── */
 
+/* ── Column alias label display ─────────────────────────────
+   Updates a .item-alias-row label to show strikethrough | alias
+   when an alias is set, or plain default when empty.           */
+function updateAliasLabelDisplay(wrapper) {
+  if (!wrapper) return;
+  const key = wrapper.dataset.key;
+  const defaultLabel = wrapper.dataset.defaultLabel;
+  const field = wrapper.querySelector('.alias-field');
+  const span = wrapper.querySelector('.alias-display');
+  if (!span || !field) return;
+  const alias = field.value.trim();
+
+  // Preserve any existing tooltip within the label
+  const label = wrapper.querySelector('label.cb-label');
+  const tip = label ? label.querySelector('.tip') : null;
+
+  if (alias && alias !== defaultLabel && alias !== (COLUMN_LABELS[key] || '')) {
+    span.innerHTML =
+      '<span class="alias-default-struck">' + escHtml(defaultLabel) + '</span>' +
+      '<span class="alias-arrow">|</span>' +
+      '<span class="alias-custom-name">' + escHtml(alias) + '</span>';
+  } else {
+    span.textContent = defaultLabel;
+  }
+  // Re-append tooltip if it exists (DOM move, not clone)
+  if (tip) span.after(tip);
+}
+
 function initSettingsPanel(){
 
   // Build immunization checkboxes
@@ -1798,6 +1851,138 @@ function initSettingsPanel(){
     frag.appendChild(label);
   });
   dom.immCheckboxes.appendChild(frag);
+
+  // ── Column alias injection ──
+  // Wrap each renameable item checkbox in an .item-alias-row grid and inject
+  // pencil edit button + alias input row with save/discard buttons.
+  const ALIAS_ITEMS = [
+    { id:'item-pha',           key:'pha',           defaultLabel:'PHA',                colLabel:'PHA' },
+    { id:'item-dental',        key:'dental',         defaultLabel:'Dental Exam',        colLabel:'Dental' },
+    { id:'item-hiv',           key:'hiv',            defaultLabel:'HIV Lab',            colLabel:'HIV Lab' },
+    { id:'item-audio',         key:'audio',          defaultLabel:'Audiogram',          colLabel:'Audiogram' },
+    { id:'item-pdha',          key:'pdha',           defaultLabel:'PDHA',               colLabel:'PDHA' },
+    { id:'item-pdhra',         key:'pdhra',          defaultLabel:'PDHRA',              colLabel:'PDHRA' },
+    { id:'item-mha2',          key:'mha2',           defaultLabel:'MHA 2',              colLabel:'MHA 2' },
+    { id:'item-mha3',          key:'mha3',           defaultLabel:'MHA 3',              colLabel:'MHA 3' },
+    { id:'item-mha4',          key:'mha4',           defaultLabel:'MHA 4',              colLabel:'MHA 4' },
+    { id:'item-anam',          key:'anam',           defaultLabel:'ANAM',               colLabel:'ANAM' },
+    { id:'item-verifyGlasses', key:'verifyGlasses',  defaultLabel:'Verify Glasses',     colLabel:'Glasses' },
+    { id:'item-verifyInserts', key:'verifyInserts',  defaultLabel:'Verify Inserts',     colLabel:'Inserts' },
+    { id:'item-warningTag',    key:'warningTag',     defaultLabel:'Verify Warning Tag', colLabel:'Warn Tag' },
+    { id:'item-bloodType',     key:'bloodType',      defaultLabel:'Blood Type',         colLabel:'Blood Type' },
+    { id:'item-refAudio',      key:'refAudio',       defaultLabel:'Ref Audiogram',      colLabel:'Ref Audio' },
+    { id:'item-dna',           key:'dna',            defaultLabel:'DNA Sample',         colLabel:'DNA' },
+    { id:'item-g6pd',          key:'g6pd',           defaultLabel:'G6PD Test',          colLabel:'G6PD' },
+    { id:'item-sickle',        key:'sickle',         defaultLabel:'Sickle Cell Test',   colLabel:'Sickle Cell' },
+    { id:'item-tst',           key:'tst',            defaultLabel:'TST Due',            colLabel:'TST' },
+    { id:'item-tstQuest',      key:'tstQuest',       defaultLabel:'TST Quest',          colLabel:'TST Quest' },
+    { id:'item-wellWoman',     key:'wellWoman',      defaultLabel:'Well-Woman',         colLabel:'Well-Woman' },
+  ];
+
+  let activeAliasRow = null;
+
+  ALIAS_ITEMS.forEach(item => {
+    const checkbox = document.getElementById(item.id);
+    if (!checkbox) return;
+    const label = checkbox.closest('label.cb-label');
+    if (!label) return;
+    const parent = label.parentNode;
+
+    // Create wrapper
+    const wrapper = document.createElement('div');
+    wrapper.className = 'item-alias-row';
+    wrapper.dataset.key = item.key;
+    wrapper.dataset.defaultLabel = item.defaultLabel;
+
+    // Wrap the original label text in an alias-display span
+    const displaySpan = document.createElement('span');
+    displaySpan.className = 'alias-display';
+    displaySpan.textContent = item.defaultLabel;
+    // Find the text node in label that contains the item name and replace it
+    const walker = document.createTreeWalker(label, NodeFilter.SHOW_TEXT);
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      if (node.textContent.trim() === item.defaultLabel) {
+        node.parentNode.replaceChild(displaySpan, node);
+        break;
+      }
+    }
+
+    // Insert wrapper in place of label
+    parent.insertBefore(wrapper, label);
+    wrapper.appendChild(label);
+
+    // Pencil button
+    const pencilBtn = document.createElement('button');
+    pencilBtn.className = 'alias-edit-btn';
+    pencilBtn.type = 'button';
+    pencilBtn.title = 'Rename column header';
+    pencilBtn.innerHTML = '<svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11.5 1.5l3 3L5 14H2v-3z"/><path d="M9.5 3.5l3 3"/></svg>';
+    wrapper.appendChild(pencilBtn);
+
+    // Alias input row
+    const inputRow = document.createElement('div');
+    inputRow.className = 'alias-input-row hidden';
+    inputRow.innerHTML =
+      `<input type="text" class="alias-field" data-key="${item.key}" placeholder="${escHtml(item.colLabel)}" maxlength="${ALIAS_MAX_LENGTH}" />` +
+      '<span class="alias-charcount">0/' + ALIAS_MAX_LENGTH + '</span>' +
+      '<button type="button" class="alias-save-btn" title="Save (Enter)">\u2713</button>' +
+      '<button type="button" class="alias-discard-btn" title="Discard (Esc)">\u2715</button>';
+    wrapper.appendChild(inputRow);
+
+    const field    = inputRow.querySelector('.alias-field');
+    const counter  = inputRow.querySelector('.alias-charcount');
+    const saveBtn  = inputRow.querySelector('.alias-save-btn');
+    const discardBtn = inputRow.querySelector('.alias-discard-btn');
+
+    // Open alias row
+    function openRow() {
+      if (activeAliasRow && activeAliasRow !== wrapper) {
+        closeRow(activeAliasRow, false);
+      }
+      // Store pre-edit value for discard revert
+      wrapper.dataset.preEditValue = field.value;
+      counter.textContent = field.value.length + '/' + ALIAS_MAX_LENGTH;
+      counter.classList.toggle('at-limit', field.value.length >= ALIAS_MAX_LENGTH);
+      inputRow.classList.remove('hidden');
+      pencilBtn.classList.add('active');
+      field.focus();
+      activeAliasRow = wrapper;
+    }
+
+    // Close alias row (save or discard)
+    function closeThisRow(save) { closeRow(wrapper, save); }
+
+    pencilBtn.addEventListener('click', () => {
+      if (activeAliasRow === wrapper) { closeThisRow(false); } else { openRow(); }
+    });
+    saveBtn.addEventListener('click', () => closeThisRow(true));
+    discardBtn.addEventListener('click', () => closeThisRow(false));
+    field.addEventListener('input', () => {
+      counter.textContent = field.value.length + '/' + ALIAS_MAX_LENGTH;
+      counter.classList.toggle('at-limit', field.value.length >= ALIAS_MAX_LENGTH);
+    });
+    field.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); closeThisRow(true); }
+      else if (e.key === 'Escape') { e.preventDefault(); closeThisRow(false); }
+    });
+  });
+
+  // Close any alias row (save=true commits the field value, false reverts)
+  function closeRow(wrapper, save) {
+    const inputRow   = wrapper.querySelector('.alias-input-row');
+    const field      = wrapper.querySelector('.alias-field');
+    const pencilBtn  = wrapper.querySelector('.alias-edit-btn');
+    if (!save) {
+      // Revert field to value it had when the row was opened
+      field.value = wrapper.dataset.preEditValue || '';
+    }
+    inputRow.classList.add('hidden');
+    pencilBtn.classList.remove('active');
+    updateAliasLabelDisplay(wrapper);
+    if (activeAliasRow === wrapper) activeAliasRow = null;
+    if (save) onSettingsChanged();
+  }
 
   // TST sub-option — show combine checkbox when either TST item is checked
   function updateTstSub() {
@@ -2028,6 +2213,13 @@ function getSettingsFromUI(){
     if(!isNaN(pd)) projectionDate=pd;
   }
 
+  // Collect column aliases (only non-empty values)
+  const columnAliases = {};
+  document.querySelectorAll('.alias-field').forEach(input => {
+    const val = input.value.trim();
+    if (val) columnAliases[input.dataset.key] = val;
+  });
+
   return{
     unitName:    dom.unitName.value.trim(),
     infoColCount: parseInt(dom.infoColCount.value, 10) || 1,
@@ -2061,7 +2253,7 @@ function getSettingsFromUI(){
     immunizationKeys, immunDisplayMode:state.immDisplayMode,
     thresholds, offEnlFilter:dom.offEnlFilter.value, sortBy:dom.sortBy.value,
     showRank:dom.showRank.checked, showSection:dom.showSection.checked,
-    dentalUseMrrsDate, projectionDate,
+    dentalUseMrrsDate, projectionDate, columnAliases,
   };
 }
 
@@ -2185,6 +2377,7 @@ function getDefaultSettings() {
     showRank:          true,
     showSection:       true,
     dentalUseMrrsDate: false,
+    columnAliases:     {},  // e.g., { hiv: 'Lab', sickle: 'SC Test' }
   };
 }
 
@@ -2256,6 +2449,14 @@ function applySettings(s) {
   dom.itemTstQuest.checked      = !!items.tstQuest;
   if(dom.itemTstCombine) dom.itemTstCombine.checked = !!items.tstCombine;
   dom.itemWellWoman.checked     = !!items.wellWoman;
+
+  // Column aliases
+  const aliases = Object.assign({}, d.columnAliases, s.columnAliases || {});
+  document.querySelectorAll('.alias-field').forEach(input => {
+    const key = input.dataset.key;
+    input.value = aliases[key] || '';
+    updateAliasLabelDisplay(input.closest('.item-alias-row'));
+  });
 
   // Dental sub-option
   dom.dentalSub.classList.toggle('hidden', !items.dental);

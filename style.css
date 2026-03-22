@@ -842,7 +842,9 @@ html, body {
   font-size: 11px;
   font-weight: 600;
   color: var(--gray-400);
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   margin-bottom: 5px;
   text-transform: uppercase;
   letter-spacing: 0.4px;
@@ -1111,7 +1113,132 @@ html, body {
 }
 .info-col-textarea:focus { outline: none; }
 
-/* 12i. Tooltip trigger (lightbulb) & floating tooltip popup */
+/* 12i. Column alias rename UI */
+.item-alias-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: auto auto;
+  align-items: center;
+}
+.alias-display {
+  overflow: hidden;
+  white-space: nowrap;
+  min-width: 0;
+}
+.alias-edit-btn {
+  background: none;
+  border: none;
+  padding: 4px 5px;
+  cursor: pointer;
+  color: var(--gray-400);
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.alias-edit-btn:hover {
+  color: var(--gray-900);
+  background: var(--gray-100);
+}
+.alias-edit-btn.active {
+  color: var(--navy);
+  background: var(--navy-light);
+}
+.alias-input-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0 4px 21px;
+  animation: aliasSlideDown 0.15s ease-out;
+}
+.alias-input-row.hidden { display: none; }
+.alias-field {
+  flex: 1;
+  font-family: var(--font);
+  font-size: 12px;
+  padding: 4px 8px;
+  color: var(--gray-900);
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: 4px;
+  outline: none;
+  height: 28px;
+  transition: border-color 0.15s;
+}
+.alias-field:focus {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 2px rgba(30, 58, 95, 0.12);
+}
+.alias-field::placeholder {
+  color: var(--gray-400);
+  font-style: italic;
+}
+.alias-charcount {
+  font-size: 10px;
+  color: var(--gray-400);
+  min-width: 28px;
+  text-align: right;
+  user-select: none;
+}
+.alias-charcount.at-limit { color: var(--red); }
+.alias-save-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--green);
+  font-size: 15px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.alias-save-btn:hover { background: var(--green-light); }
+.alias-discard-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--red);
+  font-size: 15px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: background 0.15s;
+}
+.alias-discard-btn:hover { background: var(--red-light); }
+.alias-default-struck {
+  text-decoration: line-through;
+  color: var(--gray-400);
+}
+.alias-arrow {
+  color: var(--gray-300);
+  font-size: 13px;
+  margin: 0 4px;
+}
+.alias-custom-name {
+  color: var(--navy);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 120px;
+  display: inline-block;
+  vertical-align: bottom;
+}
+@keyframes aliasSlideDown {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* 12j. Tooltip trigger (lightbulb) & floating tooltip popup */
 .tip {
   display: inline-flex;
   align-items: center;
