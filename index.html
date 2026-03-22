@@ -35,7 +35,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://formspree.io; form-action 'none'; base-uri 'none';" />
-  <title>Hitlist Hatcher 3.2</title>
+  <title>Hitlist Hatcher 3.3</title>
   <script src="xlsx.full.min.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -77,7 +77,7 @@
 
   <header class="app-header">
     <div class="app-header-inner">
-      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.2</span></h1>
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.3</span></h1>
       <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
       <div class="header-pills">
         <button class="btn-pill" id="feedbackBtn">💬 Feedback</button>
@@ -134,11 +134,9 @@
         <div class="settings-group" id="basicItemsGroup">
           <div class="settings-group-label">Basic</div>
           <label class="cb-label"><input type="checkbox" id="item-pha" checked /> PHA</label>
-          <label class="cb-label"><input type="checkbox" id="item-dental" checked /> Dental Exam
-            <span class="tip" data-tip-title="Dental Due Date Method" data-tip-body="&lt;p&gt;&lt;strong&gt;12-Month (default):&lt;/strong&gt; Adds exactly 365 days to the date of the most recent dental exam. This follows current instructions.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;MRRS-supplied date:&lt;/strong&gt; Uses the due date MRRS calculates directly — the first day of the second month after the exam month in the following year. This is often slightly different from the 365-day date.&lt;/p&gt;">💡</span>
-          </label>
+          <label class="cb-label"><input type="checkbox" id="item-dental" checked /> Dental Exam</label>
           <div class="dental-sub" id="dentalSub">
-            <span class="dental-sub-label">Due date method:</span>
+            <span class="dental-sub-label">Due date method: <span class="tip" data-tip-title="Dental Due Date Method" data-tip-body="&lt;p&gt;&lt;strong&gt;12-Month (default):&lt;/strong&gt; Adds exactly 365 days to the date of the most recent dental exam. This follows current instructions.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;MRRS-supplied date:&lt;/strong&gt; Uses the due date MRRS calculates directly — the first day of the second month after the exam month in the following year. This is often slightly different from the 365-day date.&lt;/p&gt;">💡</span></span>
             <label class="radio-label"><input type="radio" name="dentalDate" value="12month" checked /> 12-Month (365 days from exam)</label>
             <label class="radio-label"><input type="radio" name="dentalDate" value="mrrs" /> MRRS-supplied date</label>
           </div>
@@ -206,7 +204,7 @@
           </div>
           <label class="cb-label">
             <input type="checkbox" id="item-wellWoman" /> Well-Woman
-            <span class="tip" data-tip-title="Well-Woman Items" data-tip-body="&lt;p&gt;Tracks &lt;strong&gt;Mammogram&lt;/strong&gt; and &lt;strong&gt;Pap Smear&lt;/strong&gt; under a single column to protect privacy.&lt;/p&gt;&lt;p&gt;Only female personnel are evaluated. The cell reflects whichever item is most urgent.&lt;/p&gt;">💡</span>
+            <span class="tip" data-tip-title="Well-Woman Items" data-tip-body="&lt;p&gt;Tracks Mammogram and Pap Smear under a single column to protect privacy. Only female personnel are evaluated. The cell reflects whichever item is most urgent.&lt;/p&gt;">💡</span>
           </label>
         </div>
 
@@ -366,7 +364,7 @@
       <div class="modal-header">
         <div class="modal-lock">&#9432;</div>
         <div class="modal-header-text">
-          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.2</span></div>
+          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.3</span></div>
           <div class="modal-subtitle">About &amp; Version History</div>
         </div>
       </div>
@@ -401,6 +399,16 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.3.0</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Column header aliases — rename any report column via pencil icon</li>
+            <li>Aliases persist in settings and export with settings files</li>
+            <li>Relocated dental tooltip into due date method sub-box</li>
+            <li>New walkthrough step for column rename feature</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.2.0</span>
           <span class="about-version-date">MAR 2026</span>
