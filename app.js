@@ -759,12 +759,19 @@ function wtShowStep(idx) {
   const step  = WT_STEPS[idx];
   const total = WT_STEPS.length;
 
-  // Fix 4B: inject sample report when entering steps 12-14 (idx 11-13),
+  // Fix 4B: inject sample report when entering steps 13-15 (idx 12-14),
   // clear it when navigating away from that range.
   if(WT_SAMPLE_STEPS.includes(idx)) {
     wtInjectSampleReport();
   } else {
     wtClearSampleReport();
+  }
+
+  // Inject alias demo on "Rename Column Headers" step, clear on exit
+  if(idx === WT_ALIAS_DEMO_STEP) {
+    wtInjectAliasDemo();
+  } else {
+    wtClearAliasDemo();
   }
 
   // Scroll the settings panel to bring the target element into view.
@@ -793,8 +800,8 @@ function wtShowStep(idx) {
     dom.wtTip.innerHTML = step.tip;
     dom.wtTip.classList.remove('hidden');
     dom.wtTip.classList.toggle('wt-callout-tip-amber', step.tipStyle === 'amber');
-  } else if(idx === 12 && dom.reportOutput.dataset.wtSample === 'true') {
-    // Step 13 (Color Coding) has no static tip — show sample note instead
+  } else if(idx === 13 && dom.reportOutput.dataset.wtSample === 'true') {
+    // Step 14 (Color Coding) has no static tip — show sample note instead
     dom.wtTip.innerHTML = '💡 Sample report shown for illustration — generate with your MRRS file to see real data.';
     dom.wtTip.classList.remove('hidden');
     dom.wtTip.classList.remove('wt-callout-tip-amber');
@@ -874,6 +881,7 @@ function wtEnd() {
   dom.wtCallout.classList.add('hidden');
   dom.wtSpotlight.classList.add('hidden');
   wtClearSampleReport();
+  wtClearAliasDemo();
   dom.wtDoneOverlay.classList.remove('hidden');
 }
 
@@ -882,6 +890,29 @@ function wtEnd() {
 // Cleaned up when leaving steps 11-13 backwards or on tour end.
 
 const WT_SAMPLE_STEPS = [12, 13, 14]; // 0-based indices of steps 13-15
+const WT_ALIAS_DEMO_STEP = 2;        // 0-based index of "Rename Column Headers"
+
+function wtInjectAliasDemo() {
+  const hivRow = document.querySelector('.item-alias-row[data-key="hiv"]');
+  if (!hivRow) return;
+  // Don't override if user already has an alias set
+  const field = hivRow.querySelector('.alias-field');
+  if (field && field.value.trim()) return;
+  // Don't inject twice
+  if (hivRow.dataset.wtAliasDemo === 'true') return;
+  hivRow.dataset.wtAliasDemo = 'true';
+  if (field) field.value = 'Lab';
+  updateAliasLabelDisplay(hivRow);
+}
+
+function wtClearAliasDemo() {
+  const hivRow = document.querySelector('.item-alias-row[data-key="hiv"]');
+  if (!hivRow || hivRow.dataset.wtAliasDemo !== 'true') return;
+  delete hivRow.dataset.wtAliasDemo;
+  const field = hivRow.querySelector('.alias-field');
+  if (field) field.value = '';
+  updateAliasLabelDisplay(hivRow);
+}
 
 function wtInjectSampleReport() {
   if(state.reportGenerated) return;  // real report already present
