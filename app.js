@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.1.1';
+const APP_VERSION = '3.2.0';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -285,6 +285,7 @@ const dom = {
   wtDesc:              document.getElementById('wtDesc'),
   wtTip:               document.getElementById('wtTip'),
   wtBtnSkip:           document.getElementById('wtBtnSkip'),
+  wtBtnSkipWelcome:    document.getElementById('wtBtnSkipWelcome'),
   wtBtnPrev:           document.getElementById('wtBtnPrev'),
   wtBtnNext:           document.getElementById('wtBtnNext'),
   wtDoneOverlay:       document.getElementById('wtDoneOverlay'),
@@ -721,6 +722,7 @@ function wireWalkthroughHandlers() {
   };
   dom.wtBtnPrev.onclick  = () => { if(wtCurrentStep > 0) wtShowStep(wtCurrentStep - 1); };
   dom.wtBtnSkip.onclick  = wtEnd;
+  dom.wtBtnSkipWelcome.onclick = () => dom.wtWelcomeOverlay.classList.add('hidden');
   dom.wtBtnDone.onclick  = () => {
     if(dom.wtDontShow.checked) localStorage.setItem(WALKTHROUGH_KEY, 'true');
     dom.wtDoneOverlay.classList.add('hidden');
@@ -1245,8 +1247,6 @@ function logParseResults(parsed) {
   console.group('%cHitlist Hatcher — Parse Results','color:#1e3a5f;font-weight:bold;font-size:14px;');
   console.table({Total:stats.total,Officers:stats.officers,Enlisted:stats.enlisted,Skipped:stats.skipped});
   console.table(personnel.slice(0,5).map(p=>({name:p.name,rank:p.rank,dentalClass:p.dentalClass,bloodType:p.bloodType,mha2:p.mha2})));
-  window._hhPersonnel=personnel;
-  console.log('%cwindow._hhPersonnel available','color:#1e8449;font-style:italic;');
   console.groupEnd();
 }
 
@@ -1860,6 +1860,12 @@ function initSettingsPanel(){
   dom.emblemInput.addEventListener('change',e=>{
     const file=e.target.files[0]; if(!file) return;
     dom.emblemError.classList.add('hidden');
+    if(!file.type.match(/^image\/(jpeg|png)$/)){
+      dom.emblemError.textContent = 'Please select a JPG or PNG image.';
+      dom.emblemError.classList.remove('hidden');
+      dom.emblemInput.value='';
+      return;
+    }
     if(file.size > EMBLEM_MAX_BYTES){
       dom.emblemError.textContent = `Image too large (${formatBytes(file.size)}). Please use a file under 150 KB.`;
       dom.emblemError.classList.remove('hidden');
@@ -2204,6 +2210,7 @@ function saveSettings() {
    Restores all UI controls from a settings object.
    Missing keys fall back to getDefaultSettings() values.     */
 function applySettings(s) {
+  s = sanitizeObj(s);
   const d = getDefaultSettings();
   const g = (key, fallback) => (s[key] !== undefined ? s[key] : fallback);
 
@@ -2211,7 +2218,8 @@ function applySettings(s) {
   dom.unitName.value = g('unitName', d.unitName);
 
   // Emblem
-  const emb = g('emblemBase64', null);
+  let emb = g('emblemBase64', null);
+  if(emb && !String(emb).startsWith('data:image/')) emb = null;
   if(emb) {
     state.emblemBase64 = emb;
     dom.emblemPreview.style.backgroundImage = `url('${emb}')`;
@@ -2532,6 +2540,19 @@ function wireExportPdfHandler(){
 
 
 /* ── 12. UTILITIES ─────────────────────────────────────────── */
+
+// Recursively strip prototype-pollution keys from an object.
+function sanitizeObj(obj) {
+  if(obj === null || typeof obj !== 'object') return obj;
+  if(Array.isArray(obj)) return obj.map(sanitizeObj);
+  const clean = {};
+  for(const key of Object.keys(obj)) {
+    if(key === '__proto__' || key === 'constructor' || key === 'prototype') continue;
+    clean[key] = (typeof obj[key] === 'object' && obj[key] !== null)
+      ? sanitizeObj(obj[key]) : obj[key];
+  }
+  return clean;
+}
 
 function setDefaultProjectionDate(){
   const today=new Date();
