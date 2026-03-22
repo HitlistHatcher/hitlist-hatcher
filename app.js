@@ -1860,14 +1860,14 @@ function initSettingsPanel(){
   dom.emblemInput.addEventListener('change',e=>{
     const file=e.target.files[0]; if(!file) return;
     dom.emblemError.classList.add('hidden');
-    if(file.size > EMBLEM_MAX_BYTES){
-      dom.emblemError.textContent = `Image too large (${formatBytes(file.size)}). Please use a file under 150 KB.`;
+    if(!file.type.match(/^image\/(jpeg|png)$/)){
+      dom.emblemError.textContent = 'Please select a JPG or PNG image.';
       dom.emblemError.classList.remove('hidden');
       dom.emblemInput.value='';
       return;
     }
-    if(!file.type.match(/^image\/(jpeg|png)$/)){
-      dom.emblemError.textContent = 'Please select a JPG or PNG image.';
+    if(file.size > EMBLEM_MAX_BYTES){
+      dom.emblemError.textContent = `Image too large (${formatBytes(file.size)}). Please use a file under 150 KB.`;
       dom.emblemError.classList.remove('hidden');
       dom.emblemInput.value='';
       return;
