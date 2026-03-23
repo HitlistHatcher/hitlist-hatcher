@@ -189,7 +189,7 @@ const state = {
   rawData:null, personnel:[], colIndex:{}, parseStats:{},
   filteredResults:[], currentStats:{}, settings:{},
   reportGenerated:false, emblemBase64:null,
-  immDisplayMode:'grouped', _lastDentalFlag:false,
+  immDisplayMode:'grouped',
   errorReportPending:false,
 };
 
@@ -205,7 +205,6 @@ const dom = {
   uploadStatus:        document.getElementById('uploadStatus'),
   itemPha:             document.getElementById('item-pha'),
   itemDental:          document.getElementById('item-dental'),
-  dentalSub:           document.getElementById('dentalSub'),
   itemHiv:             document.getElementById('item-hiv'),
   itemAudio:           document.getElementById('item-audio'),
   itemPdha:            document.getElementById('item-pdha'),
@@ -623,7 +622,6 @@ const WT_STEPS = [
   {
     title: 'Basic Report Items',
     desc:  'Select which medical readiness items to include. <strong>Basic items</strong> — PHA, Dental, HIV Lab, and Audiogram — are checked by default. Toggle any item on or off.',
-    tip:   '💡 The Dental item has a sub-option to choose between a 12-month (365-day) due date or the MRRS-supplied date.',
     target:'basicItemsGroup', side:'right', scrollTo:'reportItemsCard',
   },
   {
@@ -1101,7 +1099,7 @@ function handleFile(file) {
         return;
       }
       state.rawData = wb;
-      const parsed  = parseMRRS(wb, false, formatCheck.rows);
+      const parsed  = parseMRRS(wb, formatCheck.rows);
       if (!parsed.personnel.length) {
         setUploadStatus('error','✗ No personnel rows found.'); dom.uploadArea.classList.add('upload-error'); return;
       }
@@ -1163,7 +1161,7 @@ function validateMrrsFormat(workbook) {
   return { valid:true, rows };
 }
 
-function parseMRRS(workbook, useMrrsDate, preloadedRows) {
+function parseMRRS(workbook, preloadedRows) {
   const sheet = workbook.Sheets[MRRS_SHEET_NAME];
   const rows  = preloadedRows || XLSX.utils.sheet_to_json(sheet,{header:1,defval:'',raw:false});
   const headerRow = rows[MRRS_HEADER_ROW]||[];
@@ -1192,9 +1190,7 @@ function parseMRRS(workbook, useMrrsDate, preloadedRows) {
   }
 
   function dentalDueDate(row) {
-    if(useMrrsDate) return parseDate(getCell(row,'DENTAL_DUE'));
-    const dt=parseDate(getCell(row,'DENTAL_DT')); if(!dt) return null;
-    const d=new Date(dt); d.setDate(d.getDate()+365); return d;
+    return parseDate(getCell(row,'DENTAL_DUE'));
   }
 
   function parseDentalClass(val) {
@@ -2038,11 +2034,8 @@ function initSettingsPanel(){
   dom.itemTst.addEventListener('change', updateTstSub);
   dom.itemTstQuest.addEventListener('change', updateTstSub);
 
-  // Dental sub-toggle
-  dom.itemDental.addEventListener('change',()=>{
-    dom.dentalSub.classList.toggle('hidden',!dom.itemDental.checked);
-    onSettingsChanged();
-  });
+  // Dental checkbox
+  dom.itemDental.addEventListener('change', onSettingsChanged);
 
   // Immunization mode toggle
   dom.immModeGroupedBtn.addEventListener('click',()=>{
@@ -2117,9 +2110,6 @@ function initSettingsPanel(){
     onSettingsChanged();
     liveUpdateEmblem();
   });
-
-  // Dental date radio
-  document.querySelectorAll('input[name="dentalDate"]').forEach(r=>r.addEventListener('change',onSettingsChanged));
 
   // Text inputs
   dom.unitName.addEventListener('input',debounce(()=>{ onSettingsChanged(); liveUpdateUnitName(); },DEBOUNCE_MS));
@@ -2247,9 +2237,6 @@ function getSettingsFromUI(){
   const y=parseInt(dom.threshYellow.value,10), g=parseInt(dom.threshGreen.value,10);
   const thresholds=(!isNaN(y)&&!isNaN(g)&&y>=1&&g>y)?{yellow:y,green:g}:DEFAULT_THRESHOLDS;
 
-  const dentalRadio=document.querySelector('input[name="dentalDate"]:checked');
-  const dentalUseMrrsDate=dentalRadio?dentalRadio.value==='mrrs':false;
-
   let projectionDate=new Date();
   if(dom.projectionDate.value){
     const pd=new Date(dom.projectionDate.value+'T00:00:00');
@@ -2296,7 +2283,7 @@ function getSettingsFromUI(){
     immunizationKeys, immunDisplayMode:state.immDisplayMode,
     thresholds, offEnlFilter:dom.offEnlFilter.value, sortBy:dom.sortBy.value,
     showRank:dom.showRank.checked, showSection:dom.showSection.checked,
-    dentalUseMrrsDate, projectionDate, columnAliases,
+    projectionDate, columnAliases,
   };
 }
 
@@ -2342,12 +2329,6 @@ dom.generateBtn.addEventListener('click',()=>{
     const settings = getSettingsFromUI();
     const today    = new Date();
     today.setHours(0,0,0,0);
-
-    // Re-parse if dental date method changed
-    if(settings.dentalUseMrrsDate !== state._lastDentalFlag){
-      const reparsed = parseMRRS(state.rawData, settings.dentalUseMrrsDate);
-      state.personnel = reparsed.personnel; state._lastDentalFlag = settings.dentalUseMrrsDate;
-    }
 
     const {results, stats} = applyFilters(state.personnel, settings, today, settings.projectionDate);
     state.filteredResults = results; state.currentStats = stats;
@@ -2419,7 +2400,6 @@ function getDefaultSettings() {
     sortBy:            'name',
     showRank:          true,
     showSection:       true,
-    dentalUseMrrsDate: false,
     columnAliases:     {},  // e.g., { hiv: 'Lab', sickle: 'SC Test' }
   };
 }
@@ -2500,12 +2480,6 @@ function applySettings(s) {
     input.value = aliases[key] || '';
     updateAliasLabelDisplay(input.closest('.item-alias-row'));
   });
-
-  // Dental sub-option
-  dom.dentalSub.classList.toggle('hidden', !items.dental);
-  const dentalUseMrrs = g('dentalUseMrrsDate', false);
-  const dentalRadios  = document.querySelectorAll('input[name="dentalDate"]');
-  dentalRadios.forEach(r => { r.checked = (r.value === 'mrrs') === dentalUseMrrs; });
 
   // Immunization mode
   const immMode = g('immunDisplayMode', d.immunDisplayMode);

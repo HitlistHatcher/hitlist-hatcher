@@ -135,11 +135,6 @@
           <div class="settings-group-label">Basic</div>
           <label class="cb-label"><input type="checkbox" id="item-pha" checked /> PHA</label>
           <label class="cb-label"><input type="checkbox" id="item-dental" checked /> Dental Exam</label>
-          <div class="dental-sub" id="dentalSub">
-            <span class="dental-sub-label">Due date method: <span class="tip" data-tip-title="Dental Due Date Method" data-tip-body="&lt;p&gt;&lt;strong&gt;12-Month (default):&lt;/strong&gt; Adds exactly 365 days to the date of the most recent dental exam. This follows current instructions.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;MRRS-supplied date:&lt;/strong&gt; Uses the due date MRRS calculates directly — the first day of the second month after the exam month in the following year. This is often slightly different from the 365-day date.&lt;/p&gt;">💡</span></span>
-            <label class="radio-label"><input type="radio" name="dentalDate" value="12month" checked /> 12-Month (365 days from exam)</label>
-            <label class="radio-label"><input type="radio" name="dentalDate" value="mrrs" /> MRRS-supplied date</label>
-          </div>
           <label class="cb-label"><input type="checkbox" id="item-hiv" checked /> HIV Lab</label>
           <label class="cb-label"><input type="checkbox" id="item-audio" checked /> Audiogram</label>
         </div>
@@ -404,6 +399,8 @@
           <span class="about-version-date">MAR 2026</span>
           <ul class="about-version-notes">
             <li>Version displays now centralized — single-source update</li>
+            <li>Removed dental due date method sub-option — now uses MRRS-supplied date directly</li>
+            <li>Emblem placeholder hidden in PDF export for cleaner output</li>
             <li>Walkthrough step 11 updated to reference column aliases in exported settings</li>
           </ul>
         </div>
