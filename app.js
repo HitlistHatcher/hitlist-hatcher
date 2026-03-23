@@ -1521,6 +1521,7 @@ function setExportBarMode(mode, officerEmpty, enlistedEmpty) {
     dom.exportPdfEnlistedBtn.disabled = !!enlistedEmpty;
     dom.exportHint.textContent = HINT_SEPARATE;
   } else {
+    dom.exportPdfBtn.disabled = false;
     dom.exportHint.textContent = HINT_SINGLE;
   }
 }
@@ -1534,7 +1535,7 @@ function renderReport(results, stats, settings, today, projDate){
         <p style="font-size:18px;font-weight:700;color:#1e3a5f;margin-bottom:8px;">No personnel due</p>
         <p style="font-size:14px;color:#444;">No one is due or upcoming for the selected items within the current warning windows.</p>
       </div>`;
-    dom.exportBar.hidden=true; return;
+    dom.exportPdfBtn.disabled=true; dom.exportPdfOfficerBtn.disabled=true; dom.exportPdfEnlistedBtn.disabled=true; return;
   }
 
   if(settings.offEnlFilter==='separate'){
@@ -1552,7 +1553,7 @@ function renderReport(results, stats, settings, today, projDate){
     wireImmTooltips();
     wireTstTooltip();
     setExportBarMode('separate', officers.length===0, enlisted.length===0);
-    dom.exportBar.hidden=false; state.reportGenerated=true; return;
+    state.reportGenerated=true; return;
   }
 
   const colDefs   = getColumnDefs(settings);
@@ -1563,7 +1564,7 @@ function renderReport(results, stats, settings, today, projDate){
   wireImmTooltips();
   wireTstTooltip();
   setExportBarMode('single');
-  dom.exportBar.hidden=false; state.reportGenerated=true;
+  state.reportGenerated=true;
 }
 
 function buildHitListHTML(results, stats, settings, today, projDate, colDefs, subtitleOverride, wrapperId){
