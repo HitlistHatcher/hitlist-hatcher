@@ -1125,6 +1125,7 @@ function handleFile(file) {
       });
       console.error('File read error:',err);
       setUploadStatus('error','✗ Could not read file.'); dom.uploadArea.classList.add('upload-error');
+      showErrorBar('upload');
     }
   };
   reader.onerror = () => setUploadStatus('error','✗ File read failed.');
