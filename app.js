@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.3.0';
+const APP_VERSION = '3.3.1';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -285,6 +285,7 @@ const dom = {
   feedbackDiagPre:     document.getElementById('feedbackDiagPre'),
   // About modal
   versionBadge:        document.getElementById('versionBadge'),
+  aboutVersionBadge:   document.getElementById('aboutVersionBadge'),
   aboutModal:          document.getElementById('aboutModal'),
   aboutClose:          document.getElementById('aboutClose'),
   aboutContactLink:    document.getElementById('aboutContactLink'),
@@ -295,6 +296,7 @@ const dom = {
   // Walkthrough
   wtSpotlight:         document.getElementById('wtSpotlight'),
   wtWelcomeOverlay:    document.getElementById('wtWelcomeOverlay'),
+  wtWelcomeVersion:    document.getElementById('wtWelcomeVersion'),
   wtBtnStart:          document.getElementById('wtBtnStart'),
   wtCallout:           document.getElementById('wtCallout'),
   wtStepBadge:         document.getElementById('wtStepBadge'),
@@ -315,8 +317,18 @@ const dom = {
 
 /* ── 4. INITIALIZATION ─────────────────────────────────────── */
 
+/** Populate all version displays from the single APP_VERSION constant. */
+function populateVersionDisplays() {
+  const shortVer = APP_VERSION.split('.').slice(0, 2).join('.');
+  document.title = 'Hitlist Hatcher ' + shortVer;
+  dom.versionBadge.textContent      = shortVer;
+  dom.aboutVersionBadge.textContent  = shortVer;
+  dom.wtWelcomeVersion.textContent   = shortVer;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Hitlist Hatcher ${APP_VERSION} — initializing`);
+  populateVersionDisplays();
   initDisclaimer();
   initSettingsPanel();
   loadSettings();
@@ -660,7 +672,7 @@ const WT_STEPS = [
   },
   {
     title: 'Save & Restore Settings',
-    desc:  '<strong>Export Settings</strong> saves all your current selections — items, thresholds, unit name, and info text — so they can be restored later. <strong>Import Settings</strong> loads a previously saved configuration. Use this to share a standard configuration across your team.',
+    desc:  '<strong>Export Settings</strong> saves all your current selections — items, thresholds, display options, unit name, info text, and any renamed column headers — so they can be restored later. <strong>Import Settings</strong> loads a previously saved configuration. Use this to share a standard configuration across your team.',
     tip:   '❗ Browser data may be cleared without notice, which will erase your saved settings. Export your settings to protect your configuration and make it portable — restore them on any computer or share them across your team for consistent reports.',
     tipStyle: 'amber',
     target:'settingsActions', side:'right', scrollTo:null,

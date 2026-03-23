@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ================================================================
-  HITLIST HATCHER 3.0
+  HITLIST HATCHER
   MRRS Medical Readiness Hit List Generator
 
   Copyright © 2026 Hitlist Hatcher. All rights reserved.
@@ -35,7 +35,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://formspree.io; form-action 'none'; base-uri 'none';" />
-  <title>Hitlist Hatcher 3.3</title>
+  <title>Hitlist Hatcher</title>
   <script src="xlsx.full.min.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -77,7 +77,7 @@
 
   <header class="app-header">
     <div class="app-header-inner">
-      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.3</span></h1>
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History"></span></h1>
       <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
       <div class="header-pills">
         <button class="btn-pill" id="feedbackBtn">💬 Feedback</button>
@@ -364,7 +364,7 @@
       <div class="modal-header">
         <div class="modal-lock">&#9432;</div>
         <div class="modal-header-text">
-          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.3</span></div>
+          <div class="modal-title">Hitlist Hatcher <span class="version-badge" id="aboutVersionBadge"></span></div>
           <div class="modal-subtitle">About &amp; Version History</div>
         </div>
       </div>
@@ -399,6 +399,14 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.3.1</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Version displays now centralized — single-source update</li>
+            <li>Walkthrough step 11 updated to reference column aliases in exported settings</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.3.0</span>
           <span class="about-version-date">MAR 2026</span>
@@ -540,7 +548,7 @@
   <div class="wt-overlay hidden" id="wtWelcomeOverlay">
     <div class="wt-welcome-box">
       <div class="wt-welcome-icon">🗺️</div>
-      <h2 class="wt-welcome-title">Welcome to Hitlist Hatcher 3.0</h2>
+      <h2 class="wt-welcome-title">Welcome to Hitlist Hatcher <span id="wtWelcomeVersion"></span></h2>
       <p class="wt-welcome-desc">
         A quick tour will show you how to upload your MRRS file, configure your
         report settings, and export a ready-to-brief hit list — in about 2 minutes.
