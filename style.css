@@ -1984,13 +1984,12 @@ html, body {
     display: block !important;
   }
 
-  /* Hide emblem placeholder in print — only real emblems should appear.
-     Override grid to auto columns so title block centers when placeholders are gone. */
-  .hitlist-header-top {
-    grid-template-columns: auto 1fr auto;
-  }
+  /* Make emblem placeholder invisible in print — still occupies grid space
+     so header layout and measurements remain unchanged. */
   .hitlist-emblem-placeholder {
-    display: none !important;
+    background: transparent !important;
+    border-color: transparent !important;
+    color: transparent !important;
   }
 
   @page {
