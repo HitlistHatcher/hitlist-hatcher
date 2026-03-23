@@ -725,7 +725,7 @@ html, body {
   position: fixed;
   bottom: 0;
   left: max(var(--settings-width), calc((100vw - 1600px) / 2 + var(--settings-width)));
-  right: max(17px, calc((100vw - 1600px) / 2));
+  right: max(17px, calc((100vw - 1600px) / 2 + 17px));
   background: var(--white);
   border-top: 2px solid var(--navy);
   padding: 12px 24px;
