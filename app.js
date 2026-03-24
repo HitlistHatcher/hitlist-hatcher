@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.3.1';
+const APP_VERSION = '3.4.0';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -191,6 +191,7 @@ const state = {
   reportGenerated:false, emblemBase64:null,
   immDisplayMode:'grouped',
   errorReportPending:false,
+  excludedIndices: new Set(),
 };
 
 
@@ -255,6 +256,14 @@ const dom = {
   importSettingsInput: document.getElementById('importSettingsInput'),
   previewPlaceholder:  document.getElementById('previewPlaceholder'),
   reportOutput:        document.getElementById('reportOutput'),
+  wtSampleOutput:      document.getElementById('wtSampleOutput'),
+  // Restore excluded personnel
+  restoreBar:          document.getElementById('restoreBar'),
+  restorePill:         document.getElementById('restorePill'),
+  restoreCount:        document.getElementById('restoreCount'),
+  restoreDropdown:     document.getElementById('restoreDropdown'),
+  restoreList:         document.getElementById('restoreList'),
+  restoreAllBtn:       document.getElementById('restoreAllBtn'),
   printOutput:         document.getElementById('printOutput'),
   exportBar:           document.getElementById('exportBar'),
   exportPdfBtn:        document.getElementById('exportPdfBtn'),
@@ -334,6 +343,7 @@ document.addEventListener('DOMContentLoaded', () => {
   wireUploadHandlers();
   wireExportPdfHandler();
   wireSettingsHandlers();
+  wireRestoreHandlers();
   wireTooltips();
   setDefaultProjectionDate();
   refreshColumnCounter();
@@ -697,8 +707,15 @@ const WT_STEPS = [
     target:'previewPanel', side:'left', scrollTo:null,
   },
   {
+    title: 'Remove Personnel',
+    desc:  'Click the <strong>\u00D7</strong> button on any row to remove that person from the report before exporting. Removed personnel appear in the <strong>Restore Personnel</strong> button above the report \u2014 click it to bring individuals back or restore all at once.',
+    tip:   '\uD83D\uDCA1 Exclusions are temporary \u2014 they reset when you generate a new report. The PDF will only include visible rows.',
+    target:'previewPanel', side:'left', scrollTo:null,
+  },
+  {
     title: 'Export to PDF',
-    desc:  'Click the <strong>Export PDF</strong> button below the report. When using <strong>Separate Reports</strong>, individual buttons appear for each group. In the print dialog, set the destination to <strong>"Save as PDF."</strong> The full header repeats on every page so each printed page is self-contained.',
+    desc:  'Click the <strong>Export PDF</strong> button below the report. When using <strong>Separate Reports</strong>, individual buttons appear for each group. In the print dialog, set the destination to <strong>\u201CSave as PDF.\u201D</strong>',
+    tip:   '\uD83D\uDCA1 For best results, use Chrome. In Edge, uncheck \u201CHeaders and footers\u201D in the print dialog to remove the browser\u2019s date, URL, and page numbers from your export.',
     target:'exportBar', side:'left', scrollTo:null,
   },
   {
@@ -782,6 +799,13 @@ function wtShowStep(idx) {
     wtInjectAliasDemo();
   } else {
     wtClearAliasDemo();
+  }
+
+  // Inject exclusion demo on "Remove Personnel" step, clear on exit
+  if(idx === WT_EXCLUSION_DEMO_STEP) {
+    wtInjectExclusionDemo();
+  } else {
+    wtClearExclusionDemo();
   }
 
   // Scroll the settings panel to bring the target element into view.
@@ -892,15 +916,17 @@ function wtEnd() {
   dom.wtSpotlight.classList.add('hidden');
   wtClearSampleReport();
   wtClearAliasDemo();
+  wtClearExclusionDemo();
   dom.wtDoneOverlay.classList.remove('hidden');
 }
 
 // ── Walkthrough sample report (Fix 4B) ─────────────────────
 // Injected when reaching step 12 with no real report generated.
-// Cleaned up when leaving steps 11-13 backwards or on tour end.
+// Cleaned up when leaving steps 12-15 backwards or on tour end.
 
-const WT_SAMPLE_STEPS = [12, 13, 14]; // 0-based indices of steps 13-15
-const WT_ALIAS_DEMO_STEP = 2;        // 0-based index of "Rename Column Headers"
+const WT_SAMPLE_STEPS = [12, 13, 14, 15, 16]; // 0-based indices of steps 13-17
+const WT_ALIAS_DEMO_STEP = 2;            // 0-based index of "Rename Column Headers"
+const WT_EXCLUSION_DEMO_STEP = 15;       // 0-based index of "Remove Personnel"
 
 function wtInjectAliasDemo() {
   const hivRow = document.querySelector('.item-alias-row[data-key="hiv"]');
@@ -924,9 +950,81 @@ function wtClearAliasDemo() {
   updateAliasLabelDisplay(hivRow);
 }
 
+// ── Walkthrough exclusion demo ────────────────────────────────
+// On the "Remove Personnel" step, pre-hide Anderson and Miller from the
+// sample report and show the restore pill with the dropdown open.
+
+function wtInjectExclusionDemo() {
+  // Find whichever container holds the sample report
+  const target = dom.wtSampleOutput.dataset.wtSample === 'true' ? dom.wtSampleOutput
+               : dom.reportOutput.dataset.wtSample === 'true'   ? dom.reportOutput
+               : null;
+  if (!target) return;
+  if (target.dataset.wtExclusionDemo === 'true') return;
+  target.dataset.wtExclusionDemo = 'true';
+
+  // Hide Anderson and Miller rows
+  const anderson = target.querySelector('tr[data-wt-sample="anderson"]');
+  const miller   = target.querySelector('tr[data-wt-sample="miller"]');
+  if (anderson) anderson.style.display = 'none';
+  if (miller)   miller.style.display = 'none';
+
+  // Show restore pill with count
+  dom.restoreCount.textContent = '2';
+  dom.restorePill.classList.add('visible');
+
+  // Build a static dropdown list for the demo
+  dom.restoreList.innerHTML = '';
+  [{ name: 'Anderson, James', rank: 'SGT' }, { name: 'Miller, Sarah', rank: 'SGT' }].forEach(p => {
+    const item = document.createElement('div');
+    item.className = 'restore-item';
+    item.innerHTML =
+      '<div class="restore-item-info">' +
+        '<div class="restore-item-name">' + escHtml(p.name) + '</div>' +
+        '<div class="restore-item-rank">' + escHtml(p.rank) + '</div>' +
+      '</div>' +
+      '<button class="restore-item-btn" disabled>Restore</button>';
+    dom.restoreList.appendChild(item);
+  });
+
+  // Open the dropdown — deferred to escape the walkthrough button's click
+  // event bubble, which would otherwise trigger the outside-click close handler.
+  setTimeout(openRestoreDropdown, 0);
+}
+
+function wtClearExclusionDemo() {
+  // Find whichever container holds the demo
+  const target = dom.wtSampleOutput.dataset.wtExclusionDemo === 'true' ? dom.wtSampleOutput
+               : dom.reportOutput.dataset.wtExclusionDemo === 'true'   ? dom.reportOutput
+               : null;
+  if (!target) return;
+  delete target.dataset.wtExclusionDemo;
+
+  // Restore hidden rows
+  const anderson = target.querySelector('tr[data-wt-sample="anderson"]');
+  const miller   = target.querySelector('tr[data-wt-sample="miller"]');
+  if (anderson) anderson.style.display = '';
+  if (miller)   miller.style.display = '';
+
+  // If sample report is still active (e.g., moving from step 16 to 15 or 17),
+  // hide the pill — the sample world has no real exclusions to show.
+  // If sample is gone (e.g., tour ended), restore real exclusion state.
+  closeRestoreDropdown();
+  const sampleStillActive = dom.wtSampleOutput.dataset.wtSample === 'true'
+                         || dom.reportOutput.dataset.wtSample === 'true';
+  if (sampleStillActive) {
+    hideRestorePill();
+  } else {
+    updateRestorePill();
+  }
+}
+
 function wtInjectSampleReport() {
-  if(state.reportGenerated) return;  // real report already present
-  if(dom.reportOutput.dataset.wtSample === 'true') return; // already injected
+  if(dom.reportOutput.dataset.wtSample === 'true' || dom.wtSampleOutput.dataset.wtSample === 'true') return; // already injected
+
+  // Determine injection target: if real report exists, use overlay; otherwise use reportOutput
+  const useOverlay = state.reportGenerated;
+  const target = useOverlay ? dom.wtSampleOutput : dom.reportOutput;
 
   const today = new Date();
   // Helper: build a date relative to today
@@ -981,6 +1079,7 @@ function wtInjectSampleReport() {
   <div class="hitlist-table-wrapper" style="margin-top:4px;">
     <table class="hitlist-table">
       <thead><tr>
+        <th class="col-action"></th>
         <th class="col-name-hdr">Name</th>
         <th>Rank</th>
         <th>PHA</th>
@@ -989,7 +1088,8 @@ function wtInjectSampleReport() {
         <th>Immunizations</th>
       </tr></thead>
       <tbody>
-        <tr>
+        <tr data-wt-sample="anderson">
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Anderson James</td>
           <td class="col-rank">SGT</td>
           <td class="col-item status-red">${fmt(relDate(-12))}</td>
@@ -998,6 +1098,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Chen Mei</td>
           <td class="col-rank">CPL</td>
           <td class="col-item cell-na">—</td>
@@ -1006,6 +1107,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Davis Robert</td>
           <td class="col-rank">SSGT</td>
           <td class="col-item cell-na">—</td>
@@ -1014,6 +1116,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Garcia Elena</td>
           <td class="col-rank">LCPL</td>
           <td class="col-item">${fmt(relDate(40))}</td>
@@ -1022,6 +1125,7 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
         </tr>
         <tr>
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Kim Jason</td>
           <td class="col-rank">CPL</td>
           <td class="col-item cell-na">—</td>
@@ -1029,7 +1133,8 @@ function wtInjectSampleReport() {
           <td class="col-item cell-na">—</td>
           <td class="col-item status-green"><div class="imm-grouped" data-tooltip="${immJson}">2 due</div></td>
         </tr>
-        <tr>
+        <tr data-wt-sample="miller">
+          <td class="col-action"><button class="row-remove-btn">&times;</button></td>
           <td class="col-name">Miller Sarah</td>
           <td class="col-rank">SGT</td>
           <td class="col-item status-red">${fmt(relDate(-3))}</td>
@@ -1043,16 +1148,39 @@ function wtInjectSampleReport() {
 </div>`;
 
   dom.previewPlaceholder.classList.add('hidden');
-  dom.reportOutput.innerHTML = sampleHTML;
-  dom.reportOutput.dataset.wtSample = 'true';
+  target.innerHTML = sampleHTML;
+  target.dataset.wtSample = 'true';
+
+  // If using overlay, hide real report and show overlay
+  if (useOverlay) {
+    dom.reportOutput.classList.add('hidden');
+    dom.wtSampleOutput.classList.remove('hidden');
+  }
+
+  // Hide any real-report restore pill while sample is showing
+  hideRestorePill();
+
   wireImmTooltips();
 }
 
 function wtClearSampleReport() {
-  if(dom.reportOutput.dataset.wtSample !== 'true') return;
-  dom.reportOutput.innerHTML = '';
-  delete dom.reportOutput.dataset.wtSample;
-  if(!state.reportGenerated) dom.previewPlaceholder.classList.remove('hidden');
+  const usedOverlay = dom.wtSampleOutput.dataset.wtSample === 'true';
+  const usedDirect  = dom.reportOutput.dataset.wtSample === 'true';
+  if (!usedOverlay && !usedDirect) return;
+
+  if (usedOverlay) {
+    dom.wtSampleOutput.innerHTML = '';
+    delete dom.wtSampleOutput.dataset.wtSample;
+    dom.wtSampleOutput.classList.add('hidden');
+    dom.reportOutput.classList.remove('hidden');
+  } else {
+    dom.reportOutput.innerHTML = '';
+    delete dom.reportOutput.dataset.wtSample;
+    if (!state.reportGenerated) dom.previewPlaceholder.classList.remove('hidden');
+  }
+
+  // Restore real exclusion pill state now that we're back in the real world
+  updateRestorePill();
 }
 
 window.addEventListener('resize', () => {
@@ -1528,6 +1656,13 @@ function setExportBarMode(mode, officerEmpty, enlistedEmpty) {
 }
 
 function renderReport(results, stats, settings, today, projDate){
+  // Reset exclusion state on every new generation
+  state.excludedIndices.clear();
+  hideRestorePill();
+
+  // Stamp each result with its index in filteredResults for exclusion tracking
+  results.forEach((r, i) => { r._sourceIndex = i; });
+
   if(results.length===0){
     dom.previewPlaceholder.classList.add('hidden');
     dom.reportOutput.innerHTML=`
@@ -1553,6 +1688,7 @@ function renderReport(results, stats, settings, today, projDate){
     dom.reportOutput.innerHTML=html;
     wireImmTooltips();
     wireTstTooltip();
+    wireRowExclusion();
     setExportBarMode('separate', officers.length===0, enlisted.length===0);
     state.reportGenerated=true; return;
   }
@@ -1564,6 +1700,7 @@ function renderReport(results, stats, settings, today, projDate){
   dom.reportOutput.innerHTML=buildHitListHTML(results,stats,settings,today,projDate,activeColDefs,null,null);
   wireImmTooltips();
   wireTstTooltip();
+  wireRowExclusion();
   setExportBarMode('single');
   state.reportGenerated=true;
 }
@@ -1711,8 +1848,11 @@ function buildLegend(settings){
 }
 
 function buildTable(results, colDefs, settings){
-  const hdr  = colDefs.map(col=>`<th class="${col.type==='identity'&&col.key==='name'?'col-name-hdr':''}">${escHtml(col.label)}</th>`).join('');
-  const rows = results.map(r=>`<tr>${colDefs.map(col=>getCellHTML(r,col,settings)).join('')}</tr>`).join('');
+  const hdr  = `<th class="col-action"></th>` + colDefs.map(col=>`<th class="${col.type==='identity'&&col.key==='name'?'col-name-hdr':''}">${escHtml(col.label)}</th>`).join('');
+  const rows = results.map(r=>{
+    const idx = r._sourceIndex != null ? r._sourceIndex : '';
+    return`<tr data-result-index="${idx}"><td class="col-action"><button class="row-remove-btn" title="Remove from report">&times;</button></td>${colDefs.map(col=>getCellHTML(r,col,settings)).join('')}</tr>`;
+  }).join('');
   return`<table class="hitlist-table"><thead><tr>${hdr}</tr></thead><tbody>${rows}</tbody></table>`;
 }
 
@@ -1819,6 +1959,200 @@ function wireTstTooltip() {
     cell.addEventListener('mouseleave', () => tip.classList.remove('visible'));
   });
 }
+
+
+/* ── 8b. ROW EXCLUSION ─────────────────────────────────────── */
+
+// Wire event delegation for × buttons on rendered report rows.
+// Uses a single listener on reportOutput for all tables (combined + separate).
+function wireRowExclusion() {
+  dom.reportOutput.addEventListener('click', function(e) {
+    const btn = e.target.closest('.row-remove-btn');
+    if (!btn) return;
+    try {
+      const tr = btn.closest('tr');
+      if (!tr) return;
+      const idx = parseInt(tr.dataset.resultIndex, 10);
+      if (isNaN(idx)) return;
+
+      const wrapper = tr.closest('.hitlist-table-wrapper');
+      if (wrapper) wrapper.classList.add('animating-removal');
+      tr.classList.add('removing');
+
+      setTimeout(() => {
+        if (wrapper) wrapper.classList.remove('animating-removal');
+        tr.style.display = 'none';
+        state.excludedIndices.add(idx);
+        updateRestorePill();
+        checkAllExcluded();
+      }, 250);
+    } catch(err) {
+      captureError({ type: 'row-exclusion', message: err.message, stack: err.stack || '' });
+      showErrorBar('exclusion');
+    }
+  });
+}
+
+// Show the all-excluded contextual message when every visible row is hidden.
+function checkAllExcluded() {
+  const visibleRows = dom.reportOutput.querySelectorAll('.hitlist-table tbody tr:not([style*="display: none"])');
+  if (visibleRows.length === 0 && state.excludedIndices.size > 0) {
+    // Hide all hitlist wrappers and show contextual message
+    dom.reportOutput.querySelectorAll('.hitlist-wrapper').forEach(w => { w.style.display = 'none'; });
+    let msg = dom.reportOutput.querySelector('.all-excluded-message');
+    if (!msg) {
+      const div = document.createElement('div');
+      div.className = 'all-excluded-message';
+      div.innerHTML =
+        '<div class="all-excluded-icon">\u{1F464}</div>' +
+        '<p class="all-excluded-title">All personnel excluded</p>' +
+        '<p class="all-excluded-desc">' +
+        'All personnel on this report have been removed. ' +
+        'Use <strong>Restore Personnel</strong> above to bring them back, ' +
+        'or click <strong>Generate Hit List</strong> to start fresh.' +
+        '</p>';
+      dom.reportOutput.appendChild(div);
+    }
+  } else {
+    // Remove the message and show wrappers
+    const msg = dom.reportOutput.querySelector('.all-excluded-message');
+    if (msg) msg.remove();
+    dom.reportOutput.querySelectorAll('.hitlist-wrapper').forEach(w => { w.style.display = ''; });
+  }
+}
+
+// Restore a single excluded person by index.
+function restoreOne(idx) {
+  try {
+    state.excludedIndices.delete(idx);
+    const tr = dom.reportOutput.querySelector('tr[data-result-index="' + idx + '"]');
+    if (tr) {
+      tr.classList.remove('removing');
+      tr.style.display = '';
+    }
+    updateRestorePill();
+    checkAllExcluded();
+    // Close dropdown if empty
+    if (state.excludedIndices.size === 0) closeRestoreDropdown();
+    else buildRestoreList();
+  } catch(err) {
+    captureError({ type: 'row-restore', message: err.message, stack: err.stack || '' });
+    showErrorBar('restore');
+  }
+}
+
+// Restore all excluded personnel at once.
+function restoreAll() {
+  try {
+    state.excludedIndices.forEach(idx => {
+      const tr = dom.reportOutput.querySelector('tr[data-result-index="' + idx + '"]');
+      if (tr) {
+        tr.classList.remove('removing');
+        tr.style.display = '';
+      }
+    });
+    state.excludedIndices.clear();
+    closeRestoreDropdown();
+    updateRestorePill();
+    checkAllExcluded();
+  } catch(err) {
+    captureError({ type: 'row-restore-all', message: err.message, stack: err.stack || '' });
+    showErrorBar('restore');
+  }
+}
+
+// Update restore pill visibility, count badge, and dropdown list.
+function updateRestorePill() {
+  const count = state.excludedIndices.size;
+  dom.restoreCount.textContent = count;
+
+  if (count > 0) {
+    dom.restorePill.classList.add('visible');
+    // Pop animation on count badge
+    dom.restoreCount.classList.add('pop');
+    setTimeout(() => dom.restoreCount.classList.remove('pop'), 200);
+  } else {
+    dom.restorePill.classList.remove('visible');
+    closeRestoreDropdown();
+  }
+  buildRestoreList();
+}
+
+function hideRestorePill() {
+  dom.restorePill.classList.remove('visible');
+  closeRestoreDropdown();
+  dom.restoreCount.textContent = '0';
+}
+
+// Build the dropdown list of excluded personnel from state.
+function buildRestoreList() {
+  dom.restoreList.innerHTML = '';
+  state.excludedIndices.forEach(idx => {
+    const r = state.filteredResults[idx];
+    if (!r) return;
+    const p = r.person;
+    const item = document.createElement('div');
+    item.className = 'restore-item';
+
+    const info = document.createElement('div');
+    info.className = 'restore-item-info';
+    const nameEl = document.createElement('div');
+    nameEl.className = 'restore-item-name';
+    nameEl.textContent = toTitleCase(p.name);
+    const rankEl = document.createElement('div');
+    rankEl.className = 'restore-item-rank';
+    rankEl.textContent = p.rank + (p.section ? ' \u00B7 ' + p.section : '');
+    info.appendChild(nameEl);
+    info.appendChild(rankEl);
+
+    const btn = document.createElement('button');
+    btn.className = 'restore-item-btn';
+    btn.textContent = 'Restore';
+    btn.addEventListener('click', () => restoreOne(idx));
+
+    item.appendChild(info);
+    item.appendChild(btn);
+    dom.restoreList.appendChild(item);
+  });
+}
+
+function toggleRestoreDropdown() {
+  if (dom.restoreDropdown.classList.contains('open')) {
+    closeRestoreDropdown();
+  } else {
+    openRestoreDropdown();
+  }
+}
+
+function openRestoreDropdown() {
+  dom.restoreDropdown.classList.add('open');
+  dom.restorePill.classList.add('open');
+}
+
+function closeRestoreDropdown() {
+  dom.restoreDropdown.classList.remove('open');
+  dom.restorePill.classList.remove('open');
+}
+
+// Wire restore pill interactions — called once during init.
+function wireRestoreHandlers() {
+  // Click on pill toggles dropdown (but not if clicking inside dropdown itself)
+  dom.restorePill.addEventListener('click', function(e) {
+    if (e.target.closest('.restore-dropdown')) return;
+    toggleRestoreDropdown();
+  });
+
+  // Restore All button
+  dom.restoreAllBtn.addEventListener('click', restoreAll);
+
+  // Close dropdown on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.restore-pill') && dom.restoreDropdown.classList.contains('open')) {
+      closeRestoreDropdown();
+    }
+  });
+}
+
 
 function getDueDateForItem(person, key){
   const map={
@@ -2618,6 +2952,12 @@ function exportWrapperAsPdf(wrapperId) {
   try {
     // Clone the full wrapper (original DOM structure) into printOutput
     dom.printOutput.innerHTML = source.outerHTML;
+
+    // ── 0. Strip exclusion artifacts from clone ──────────────────
+    // Action column and hidden (excluded) rows must be removed before
+    // any measurements so row counts and page-break math are correct.
+    dom.printOutput.querySelectorAll('.col-action').forEach(el => el.remove());
+    dom.printOutput.querySelectorAll('tr[style*="display: none"]').forEach(el => el.remove());
 
     // ── 1. Measure heights at print dimensions ───────────────────
     // Temporarily reveal off-screen at the correct print width so that

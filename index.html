@@ -333,7 +333,25 @@
         <div class="preview-placeholder-icon">&#128203;</div>
         <p>Your hit list will appear here after uploading a MRRS file and clicking <strong>Generate Hit List</strong>.</p>
       </div>
+
+      <!-- Restore excluded personnel -->
+      <div class="restore-bar" id="restoreBar">
+        <div class="restore-pill" id="restorePill">
+          <span class="restore-icon">&#8617;</span>
+          <span>Restore Personnel</span>
+          <span class="restore-count" id="restoreCount">0</span>
+          <div class="restore-dropdown" id="restoreDropdown">
+            <div class="restore-dropdown-header">Excluded Personnel</div>
+            <div class="restore-dropdown-list" id="restoreList"></div>
+            <div class="restore-dropdown-footer">
+              <button class="restore-all-btn" id="restoreAllBtn">&#8617; Restore All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="report-output" id="reportOutput"></div>
+      <div class="report-output hidden" id="wtSampleOutput"></div>
     </section>
 
   </main>
@@ -394,6 +412,16 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.4.0</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Remove personnel from report before exporting — click × to exclude, use Restore to bring back</li>
+            <li>Restore Personnel button with per-name restore and Restore All</li>
+            <li>Exclusions are session-only — reset on each new report generation</li>
+            <li>New walkthrough step demonstrating the row exclusion feature</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.3.1</span>
           <span class="about-version-date">MAR 2026</span>
