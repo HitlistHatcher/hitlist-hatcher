@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <!--
   ================================================================
-  HITLIST HATCHER 3.0
+  HITLIST HATCHER
   MRRS Medical Readiness Hit List Generator
 
   Copyright © 2026 Hitlist Hatcher. All rights reserved.
@@ -35,7 +35,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src https://formspree.io; form-action 'none'; base-uri 'none';" />
-  <title>Hitlist Hatcher 3.3</title>
+  <title>Hitlist Hatcher</title>
   <script src="xlsx.full.min.js"></script>
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -77,7 +77,7 @@
 
   <header class="app-header">
     <div class="app-header-inner">
-      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History">3.3</span></h1>
+      <h1 class="app-title">Hitlist Hatcher <span class="version-badge" id="versionBadge" role="button" tabindex="0" title="About & Version History"></span></h1>
       <p class="app-subtitle">MRRS Medical Readiness Hit List Generator</p>
       <div class="header-pills">
         <button class="btn-pill" id="feedbackBtn">💬 Feedback</button>
@@ -135,11 +135,6 @@
           <div class="settings-group-label">Basic</div>
           <label class="cb-label"><input type="checkbox" id="item-pha" checked /> PHA</label>
           <label class="cb-label"><input type="checkbox" id="item-dental" checked /> Dental Exam</label>
-          <div class="dental-sub" id="dentalSub">
-            <span class="dental-sub-label">Due date method: <span class="tip" data-tip-title="Dental Due Date Method" data-tip-body="&lt;p&gt;&lt;strong&gt;12-Month (default):&lt;/strong&gt; Adds exactly 365 days to the date of the most recent dental exam. This follows current instructions.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;MRRS-supplied date:&lt;/strong&gt; Uses the due date MRRS calculates directly — the first day of the second month after the exam month in the following year. This is often slightly different from the 365-day date.&lt;/p&gt;">💡</span></span>
-            <label class="radio-label"><input type="radio" name="dentalDate" value="12month" checked /> 12-Month (365 days from exam)</label>
-            <label class="radio-label"><input type="radio" name="dentalDate" value="mrrs" /> MRRS-supplied date</label>
-          </div>
           <label class="cb-label"><input type="checkbox" id="item-hiv" checked /> HIV Lab</label>
           <label class="cb-label"><input type="checkbox" id="item-audio" checked /> Audiogram</label>
         </div>
@@ -338,7 +333,25 @@
         <div class="preview-placeholder-icon">&#128203;</div>
         <p>Your hit list will appear here after uploading a MRRS file and clicking <strong>Generate Hit List</strong>.</p>
       </div>
+
+      <!-- Restore excluded personnel -->
+      <div class="restore-bar" id="restoreBar">
+        <div class="restore-pill" id="restorePill">
+          <span class="restore-icon">&#8617;</span>
+          <span>Restore Personnel</span>
+          <span class="restore-count" id="restoreCount">0</span>
+          <div class="restore-dropdown" id="restoreDropdown">
+            <div class="restore-dropdown-header">Excluded Personnel</div>
+            <div class="restore-dropdown-list" id="restoreList"></div>
+            <div class="restore-dropdown-footer">
+              <button class="restore-all-btn" id="restoreAllBtn">&#8617; Restore All</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="report-output" id="reportOutput"></div>
+      <div class="report-output hidden" id="wtSampleOutput"></div>
     </section>
 
   </main>
@@ -347,13 +360,13 @@
   <div class="print-only" id="printOutput"></div>
 
   <!-- Export bar -->
-  <div class="export-bar" id="exportBar" hidden>
+  <div class="export-bar" id="exportBar">
     <span class="export-copyright">&copy; <span id="copyrightYear"></span> Hitlist Hatcher. All rights reserved.</span>
     <span class="export-hint" id="exportHint">In the print dialog, set Destination to &#8220;Save as PDF&#8221;</span>
-    <button class="btn-export" id="exportPdfBtn">&#128438; Export PDF</button>
-    <button class="btn-export btn-export-officer hidden" id="exportPdfOfficerBtn">&#128438; Export Officer PDF</button>
+    <button class="btn-export" id="exportPdfBtn" disabled>&#128438; Export PDF</button>
+    <button class="btn-export btn-export-officer hidden" id="exportPdfOfficerBtn" disabled>&#128438; Export Officer PDF</button>
     <div class="btn-divider hidden" id="exportBtnDivider"></div>
-    <button class="btn-export btn-export-enlisted hidden" id="exportPdfEnlistedBtn">&#128438; Export Enlisted PDF</button>
+    <button class="btn-export btn-export-enlisted hidden" id="exportPdfEnlistedBtn" disabled>&#128438; Export Enlisted PDF</button>
   </div>
 
 
@@ -364,7 +377,7 @@
       <div class="modal-header">
         <div class="modal-lock">&#9432;</div>
         <div class="modal-header-text">
-          <div class="modal-title">Hitlist Hatcher <span class="version-badge">3.3</span></div>
+          <div class="modal-title">Hitlist Hatcher <span class="version-badge" id="aboutVersionBadge"></span></div>
           <div class="modal-subtitle">About &amp; Version History</div>
         </div>
       </div>
@@ -399,6 +412,26 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.4.0</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Remove personnel from report before exporting — click × to exclude, use Restore to bring back</li>
+            <li>Restore Personnel button with per-name restore and Restore All</li>
+            <li>Exclusions are session-only — reset on each new report generation</li>
+            <li>New walkthrough step demonstrating the row exclusion feature</li>
+          </ul>
+        </div>
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.3.1</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Version displays now centralized — single-source update</li>
+            <li>Removed dental due date method sub-option — now uses MRRS-supplied date directly</li>
+            <li>Emblem placeholder hidden in PDF export for cleaner output</li>
+            <li>Walkthrough step 11 updated to reference column aliases in exported settings</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.3.0</span>
           <span class="about-version-date">MAR 2026</span>
@@ -540,7 +573,7 @@
   <div class="wt-overlay hidden" id="wtWelcomeOverlay">
     <div class="wt-welcome-box">
       <div class="wt-welcome-icon">🗺️</div>
-      <h2 class="wt-welcome-title">Welcome to Hitlist Hatcher 3.0</h2>
+      <h2 class="wt-welcome-title">Welcome to Hitlist Hatcher <span id="wtWelcomeVersion"></span></h2>
       <p class="wt-welcome-desc">
         A quick tour will show you how to upload your MRRS file, configure your
         report settings, and export a ready-to-brief hit list — in about 2 minutes.
