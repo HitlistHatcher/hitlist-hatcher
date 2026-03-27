@@ -215,6 +215,84 @@ html, body {
   font-style: italic;
 }
 
+/* 4b. Accordion sections */
+.acc-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.acc-section {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+.acc-section.open {
+  border-color: var(--navy-light);
+}
+
+.acc-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.12s;
+}
+.acc-header:hover {
+  background: var(--gray-50);
+}
+.acc-section.open > .acc-header {
+  border-bottom: 2px solid var(--navy-light);
+}
+
+.acc-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--navy);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  flex: 1;
+}
+
+.acc-chevron {
+  font-size: 10px;
+  color: var(--gray-400);
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+.acc-section.open .acc-chevron {
+  transform: rotate(180deg);
+}
+
+.acc-ico {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+.acc-ico svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--gray-400);
+  transition: fill 0.15s;
+}
+.acc-section.open .acc-ico svg {
+  fill: var(--navy);
+}
+
+.acc-body {
+  display: none;
+  padding: 10px 14px 14px;
+}
+.acc-section.open > .acc-body {
+  display: block;
+}
+
 
 /* ── 5. FILE UPLOAD AREA ───────────────────────────────────── */
 
@@ -268,6 +346,10 @@ html, body {
   margin-top: 8px;
   min-height: 18px;
   font-weight: 600;
+}
+.upload-status:empty {
+  min-height: 0;
+  margin-top: 0;
 }
 
 .upload-status.success { color: var(--green); }
@@ -452,13 +534,13 @@ html, body {
 }
 
 /* 10b. Report header */
-.hitlist-header {
-  background: var(--navy);
-  color: var(--white);
-  padding: 0;
+.hitlist-print-group {
+  overflow: hidden;
 }
 
 .hitlist-header-top {
+  background: var(--navy);
+  color: var(--white);
   display: grid;
   grid-template-columns: 80px 1fr 80px;
   align-items: center;
@@ -528,6 +610,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--navy-dark);
+  color: var(--white);
   border-top: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -2212,9 +2295,7 @@ html, body {
 
 /* ── 16. PRINT / PDF STYLES ───────────────────────────────── */
 
-.print-only { display: none; }
-.print-page-spacer { display: none; }  /* shown only in @media print */
-.print-col-names-repeat { display: none; }  /* shown only in @media print */
+.print-only { display: none; } /* shown only in @media print */
 
 @media print {
 
@@ -2222,6 +2303,8 @@ html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
+  html, body { background: #fff !important; }
 
   /* Hide all UI — including .app-layout (prevents blank first page) */
   .app-header,
@@ -2240,6 +2323,7 @@ html, body {
 
   .print-only {
     display: block !important;
+    background: #fff !important;
   }
 
   /* Make emblem placeholder invisible in print — still occupies grid space
@@ -2260,46 +2344,24 @@ html, body {
     margin: 0.35in 0.35in 0.45in 0.35in;
   }
 
-  .hitlist-wrapper {
-    box-shadow: none;
-    border-radius: 0;
-    margin-bottom: 0;
+  /* Page sections — each contains a header block + table chunk.
+     exportWrapperAsPdf() builds these dynamically. */
+  .print-page-section {
     overflow: visible;
   }
+  .print-page-section table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-page-section tr { page-break-inside: avoid; }
 
-  /* Header and legend: fixed to top of every page, repeating via
-     position:fixed. padding-top on the table wrapper (page 1) and
-     spacer rows in tbody (pages 2+) prevent data from being obscured. */
-  .hitlist-header {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    page-break-inside: avoid;
-    page-break-after: avoid;
+  .print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
   }
 
-  .hitlist-legend {
-    position: fixed;
-    left: 0;
-    right: 0;
-    z-index: 10;
-    page-break-inside: avoid;
-    page-break-after: avoid;
-    /* top is set dynamically via #printHeaderPad */
-  }
-
-  /* Table wrapper must not clip content during print */
-  .hitlist-table-wrapper {
-    overflow: visible;
-    /* padding-top set dynamically via #printHeaderPad for page 1 */
-  }
-
-  .hitlist-table tr   { page-break-inside: avoid; }
-
-  .hitlist-table td,
-  .hitlist-table th {
+  .print-page-section td,
+  .print-page-section th {
     font-size: 10px;
     padding: 4px 3px;
   }
@@ -2307,6 +2369,53 @@ html, body {
   .hitlist-unit-name  { font-size: 18px; }
   .hitlist-title-line { font-size: 12px; }
 }
+
+/* ── What's New Modal ──────────────────────────────────────── */
+
+.whatsnew-box {
+  max-width: 440px;
+}
+
+.whatsnew-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.whatsnew-list li {
+  position: relative;
+  padding: 5px 0 5px 20px;
+  font-size: 13px;
+  color: var(--gray-700);
+  line-height: 1.5;
+}
+.whatsnew-list li::before {
+  content: '✦';
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-size: 11px;
+}
+
+.whatsnew-missed {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--gray-400);
+}
+.whatsnew-missed.hidden { display: none; }
+
+.whatsnew-history {
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+.whatsnew-history-link {
+  color: var(--navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.whatsnew-history-link:hover { color: var(--navy-dark); }
+
 
 /* ── About Modal ───────────────────────────────────────────── */
 

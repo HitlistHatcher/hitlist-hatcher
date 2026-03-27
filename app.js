@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.4.0';
+const APP_VERSION = '3.5.0';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -76,6 +76,11 @@ const DEFAULT_THRESHOLDS = { yellow:7, green:30 };
 const STORAGE_KEY      = 'hitlistHatcher_settings_v3';
 const DISCLAIMER_KEY   = 'hitlistHatcher_disclaimerSeen';
 const WALKTHROUGH_KEY  = 'hitlistHatcher_walkthroughSeen';
+const VERSION_KEY     = 'hitlistHatcher_lastSeenVersion';
+
+const VERSION_HISTORY = [
+  '3.5.0','3.4.0','3.3.1','3.3.0','3.2.0','3.1.2','3.1.1','3.1.0','3.0.0'
+];
 const COL_WARN_YELLOW  = 12;
 const COL_WARN_RED     = 14;
 const EMBLEM_MAX_BYTES = 153600;  // 150KB raw file size limit
@@ -320,6 +325,20 @@ const dom = {
   wtDoneOverlay:       document.getElementById('wtDoneOverlay'),
   wtDontShow:          document.getElementById('wtDontShow'),
   wtBtnDone:           document.getElementById('wtBtnDone'),
+  // PDF export toggles
+  pdfRepeatHeader:     document.getElementById('pdfRepeatHeader'),
+  pdfRepeatSummary:    document.getElementById('pdfRepeatSummary'),
+  pdfRepeatInfoBar:    document.getElementById('pdfRepeatInfoBar'),
+  pdfRepeatLegend:     document.getElementById('pdfRepeatLegend'),
+  pdfRepeatColNames:   document.getElementById('pdfRepeatColNames'),
+  // What's New modal
+  whatsNewModal:       document.getElementById('whatsNewModal'),
+  whatsNewVersion:     document.getElementById('whatsNewVersion'),
+  whatsNewList:        document.getElementById('whatsNewList'),
+  whatsNewMissed:      document.getElementById('whatsNewMissed'),
+  whatsNewMissedCount: document.getElementById('whatsNewMissedCount'),
+  whatsNewHistoryLink: document.getElementById('whatsNewHistoryLink'),
+  whatsNewDismiss:     document.getElementById('whatsNewDismiss'),
 };
 
 
@@ -332,23 +351,25 @@ function populateVersionDisplays() {
   dom.versionBadge.textContent      = shortVer;
   dom.aboutVersionBadge.textContent  = shortVer;
   dom.wtWelcomeVersion.textContent   = shortVer;
+  if (dom.whatsNewVersion) dom.whatsNewVersion.textContent = 'v' + shortVer;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
   console.log(`Hitlist Hatcher ${APP_VERSION} — initializing`);
   populateVersionDisplays();
-  initDisclaimer();
+  initAboutModal();       // Must be before initDisclaimer — What's New needs _openToTab
+  initDisclaimer();       // Chains: disclaimer → What's New (if needed) → walkthrough
   initSettingsPanel();
   loadSettings();
   wireUploadHandlers();
   wireExportPdfHandler();
   wireSettingsHandlers();
   wireRestoreHandlers();
+  wireAccordionHandlers();
   wireTooltips();
   setDefaultProjectionDate();
   refreshColumnCounter();
   initFeedbackModal();
-  initAboutModal();
   console.log('Ready.');
 });
 
@@ -358,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initDisclaimer() {
   if (localStorage.getItem(DISCLAIMER_KEY) === 'true') {
     dom.disclaimerModal.classList.add('hidden');
-    initWalkthrough();
+    proceedAfterDisclaimer();
     return;
   }
   dom.disclaimerModal.classList.remove('hidden');
@@ -366,9 +387,24 @@ function initDisclaimer() {
     if (dom.disclaimerRemember.checked) {
       localStorage.setItem(DISCLAIMER_KEY, 'true');
     }
+    // Seed version key on every dismiss — tracks "has been here before"
+    // independently of the "don't show again" checkbox. This ensures
+    // returning users get What's New notifications even if they choose
+    // to see the disclaimer every time.
+    if (!localStorage.getItem(VERSION_KEY)) {
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+    }
     dom.disclaimerModal.classList.add('hidden');
-    initWalkthrough();
+    proceedAfterDisclaimer();
   });
+}
+
+/** Sequential chain: disclaimer → What's New (if needed) → walkthrough.
+ *  If What's New shows, walkthrough waits until What's New is dismissed. */
+function proceedAfterDisclaimer() {
+  if (!showWhatsNewIfNeeded()) {
+    initWalkthrough();
+  }
 }
 
 
@@ -585,8 +621,6 @@ function initAboutModal() {
 
   if(!dom.versionBadge || !dom.aboutModal) return;
 
-  function closeAbout() { dom.aboutModal.classList.add('hidden'); }
-
   function switchAboutTab(tab, panel) {
     [dom.aboutTabCopy, dom.aboutTabVer].forEach(t => t.classList.remove('active'));
     [dom.aboutPanelCopy, dom.aboutPanelVer].forEach(p => p.classList.remove('active'));
@@ -603,6 +637,13 @@ function initAboutModal() {
     dom.aboutModal.classList.remove('hidden');
   }
 
+  // Exposed for What's New "View full history" link
+  dom.aboutModal._openToTab = function(tabId) {
+    if (tabId === 'ver') switchAboutTab(dom.aboutTabVer, dom.aboutPanelVer);
+    else switchAboutTab(dom.aboutTabCopy, dom.aboutPanelCopy);
+    dom.aboutModal.classList.remove('hidden');
+  };
+
   dom.versionBadge.addEventListener('click', openAbout);
   dom.versionBadge.addEventListener('keydown', e => {
     if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openAbout(); }
@@ -618,9 +659,135 @@ function initAboutModal() {
       dom.feedbackOverlay.classList.remove('hidden');
     });
   }
+
+  function closeAbout() {
+    dom.aboutModal.classList.add('hidden');
+    // Fire one-time callback if set (used by What's New → View full history → walkthrough chain)
+    if (typeof dom.aboutModal._onCloseOnce === 'function') {
+      const cb = dom.aboutModal._onCloseOnce;
+      dom.aboutModal._onCloseOnce = null;
+      cb();
+    }
+  }
 }
 
-/* ── 4d. WALKTHROUGH ───────────────────────────────────────── */
+
+/* ── 4f. WHAT'S NEW ───────────────────────────────────────── */
+
+/** Show What's New modal if a version update is detected.
+ *  Returns true if modal was shown, false otherwise.
+ *  When shown, the dismiss handler chains to initWalkthrough(). */
+function showWhatsNewIfNeeded() {
+  if (!dom.whatsNewModal || !dom.whatsNewDismiss) return false;
+
+  const storedVer = localStorage.getItem(VERSION_KEY);
+
+  // VERSION_KEY is seeded on first-ever disclaimer dismiss, so:
+  //   absent → usually a new user → don't show
+  //   present + = APP_VERSION → already seen this version → don't show
+  //   present + ≠ APP_VERSION → version changed → show
+  //
+  // Transition case: v3.4.0 users have DISCLAIMER_KEY but no VERSION_KEY.
+  // They're returning users who should see What's New. Detect via disclaimerSeen.
+  // TODO(v3.6.0): Remove this fallback — all users will have VERSION_KEY after one v3.5.0 load.
+  if (!storedVer) {
+    const disclaimerSeen = localStorage.getItem(DISCLAIMER_KEY) === 'true';
+    if (!disclaimerSeen) return false; // truly new user
+    // else: returning user, first encounter with version notification — fall through to show
+  } else if (storedVer === APP_VERSION) {
+    return false; // already seen this version
+  }
+
+  // Calculate missed versions
+  if (storedVer) {
+    const storedIdx = VERSION_HISTORY.indexOf(storedVer);
+    if (storedIdx > 1) {
+      const missed = storedIdx - 1;
+      dom.whatsNewMissedCount.textContent = missed;
+      dom.whatsNewMissed.classList.remove('hidden');
+    }
+  }
+
+  // Show modal
+  dom.whatsNewModal.classList.remove('hidden');
+
+  function dismissWhatsNew() {
+    dom.whatsNewModal.classList.add('hidden');
+    localStorage.setItem(VERSION_KEY, APP_VERSION);
+    initWalkthrough(); // chain: What's New → walkthrough
+  }
+
+  // Dismiss handler — "Got it" button only (no overlay click)
+  dom.whatsNewDismiss.addEventListener('click', dismissWhatsNew);
+
+  // "View full history" link — opens About modal, defers walkthrough
+  // until About is closed (not immediate like "Got it")
+  if (dom.whatsNewHistoryLink) {
+    dom.whatsNewHistoryLink.addEventListener('click', e => {
+      e.preventDefault();
+      dom.whatsNewModal.classList.add('hidden');
+      localStorage.setItem(VERSION_KEY, APP_VERSION);
+      if (dom.aboutModal._openToTab) dom.aboutModal._openToTab('ver');
+      // Defer walkthrough until About modal is closed
+      dom.aboutModal._onCloseOnce = () => { initWalkthrough(); };
+    });
+  }
+
+  return true; // modal shown — walkthrough deferred to dismiss
+}
+
+
+/* ── 4g. ACCORDION ────────────────────────────────────────── */
+
+function wireAccordionHandlers() {
+  document.querySelectorAll('.acc-header').forEach(header => {
+    header.addEventListener('click', () => {
+      const section = header.closest('.acc-section');
+      if (!section) return;
+      section.classList.toggle('open');
+      saveAccordionState();
+    });
+  });
+}
+
+/** Save accordion expanded/collapsed state to localStorage.
+ *  Lightweight — does NOT trigger onSettingsChanged/refreshColumnCounter. */
+function saveAccordionState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const settings = raw ? JSON.parse(raw) : {};
+    settings.accordionState = getAccordionStateFromDOM();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch(e) {
+    console.warn('Hitlist Hatcher: could not save accordion state', e);
+  }
+}
+
+/** Restore accordion state from settings object. */
+function applyAccordionState(accState) {
+  if (!accState || typeof accState !== 'object') return;
+  // Suppress CSS transitions during initial state application
+  // to prevent chevron spin animation on page load
+  document.querySelectorAll('.acc-section[id]').forEach(section => {
+    section.style.transition = 'none';
+    const chevron = section.querySelector('.acc-chevron');
+    if (chevron) chevron.style.transition = 'none';
+
+    const key = section.querySelector('.acc-header')?.dataset.acc;
+    if (key && accState[key] !== undefined) {
+      section.classList.toggle('open', !!accState[key]);
+    }
+
+    // Re-enable transitions after a frame
+    requestAnimationFrame(() => {
+      section.style.transition = '';
+      if (chevron) chevron.style.transition = '';
+    });
+  });
+}
+
+
+/* ── 4h. WALKTHROUGH ───────────────────────────────────────── */
 
 const WT_STEPS = [
   {
@@ -714,7 +881,7 @@ const WT_STEPS = [
   },
   {
     title: 'Export to PDF',
-    desc:  'Click the <strong>Export PDF</strong> button below the report. When using <strong>Separate Reports</strong>, individual buttons appear for each group. In the print dialog, set the destination to <strong>\u201CSave as PDF.\u201D</strong>',
+    desc:  'Click the <strong>Export PDF</strong> button below the report to save your hit list. In the print dialog, set the destination to <strong>\u201CSave as PDF.\u201D</strong> By default, the full header repeats on every page \u2014 customize which elements repeat in the <strong>PDF Export</strong> section of the settings panel.',
     tip:   '\uD83D\uDCA1 For best results, use Chrome. In Edge, uncheck \u201CHeaders and footers\u201D in the print dialog to remove the browser\u2019s date, URL, and page numbers from your export.',
     target:'exportBar', side:'left', scrollTo:null,
   },
@@ -735,6 +902,11 @@ let wtCurrentStep = 0;
 
 function initWalkthrough() {
   if(!dom.wtWelcomeOverlay) return;
+
+  // Sync "Don't show" checkbox with saved preference
+  if(dom.wtDontShow && localStorage.getItem(WALKTHROUGH_KEY) === 'true') {
+    dom.wtDontShow.checked = true;
+  }
 
   // Wire Tutorial button
   if(dom.tutorialBtn) dom.tutorialBtn.addEventListener('click', launchWalkthrough);
@@ -777,6 +949,7 @@ function wireWalkthroughHandlers() {
   dom.wtBtnSkipWelcome.onclick = () => dom.wtWelcomeOverlay.classList.add('hidden');
   dom.wtBtnDone.onclick  = () => {
     if(dom.wtDontShow.checked) localStorage.setItem(WALKTHROUGH_KEY, 'true');
+    else localStorage.removeItem(WALKTHROUGH_KEY);
     dom.wtDoneOverlay.classList.add('hidden');
   };
 }
@@ -808,13 +981,22 @@ function wtShowStep(idx) {
     wtClearExclusionDemo();
   }
 
+  // Auto-expand collapsed accordion sections so the spotlight target is visible.
+  const scrollTarget = step.scrollTo
+    ? document.getElementById(step.scrollTo)
+    : document.getElementById(step.target);
+
+  if (scrollTarget) {
+    const accSection = scrollTarget.closest('.acc-section');
+    if (accSection && !accSection.classList.contains('open')) {
+      accSection.classList.add('open');
+    }
+  }
+
   // Scroll the settings panel to bring the target element into view.
   // getBoundingClientRect delta is used instead of offsetTop — offsetTop
   // resolves relative to the nearest positioned ancestor which may not be
   // .settings-scroll, giving incorrect results in nested scroll containers.
-  const scrollTarget = step.scrollTo
-    ? document.getElementById(step.scrollTo)
-    : document.getElementById(step.target);
   const settingsScroll = document.querySelector('.settings-scroll');
   if(scrollTarget && settingsScroll && settingsScroll.contains(scrollTarget)) {
     const SCROLL_PAD    = 20; // px breathing room above the spotlight ring
@@ -1052,7 +1234,7 @@ function wtInjectSampleReport() {
 
   const sampleHTML = `
 <div class="hitlist-wrapper">
-  <div class="hitlist-header" style="position:relative;">
+  <div class="hitlist-print-group">
     <div class="hitlist-header-top">
       <div class="hitlist-emblem-placeholder">Unit<br/>Emblem</div>
       <div class="hitlist-title-block">
@@ -1068,13 +1250,13 @@ function wtInjectSampleReport() {
       <div class="hitlist-stat"><span class="hitlist-stat-label">Partial</span><span class="hitlist-stat-value stat-warn">4.0%</span></div>
       <div class="hitlist-stat"><span class="hitlist-stat-label">Indeterminate</span><span class="hitlist-stat-value stat-neutral">3.0%</span></div>
     </div>
-  </div>
-  <div class="hitlist-legend">
-    <span class="hitlist-legend-label">Key:</span>
-    <span class="legend-item"><span class="legend-swatch red"></span>Overdue / Class 3–4</span>
-    <span class="legend-item"><span class="legend-swatch yellow"></span>Due within 7 days</span>
-    <span class="legend-item"><span class="legend-swatch green"></span>Due within 30 days</span>
-    <span class="legend-item"><span class="legend-swatch none" style="border:1px solid #c8ceda;"></span>Due beyond 30 days</span>
+    <div class="hitlist-legend">
+      <span class="hitlist-legend-label">Key:</span>
+      <span class="legend-item"><span class="legend-swatch red"></span>Overdue / Class 3–4</span>
+      <span class="legend-item"><span class="legend-swatch yellow"></span>Due within 7 days</span>
+      <span class="legend-item"><span class="legend-swatch green"></span>Due within 30 days</span>
+      <span class="legend-item"><span class="legend-swatch none" style="border:1px solid #c8ceda;"></span>Due beyond 30 days</span>
+    </div>
   </div>
   <div class="hitlist-table-wrapper" style="margin-top:4px;">
     <table class="hitlist-table">
@@ -1708,8 +1890,10 @@ function renderReport(results, stats, settings, today, projDate){
 function buildHitListHTML(results, stats, settings, today, projDate, colDefs, subtitleOverride, wrapperId){
   const idAttr = wrapperId ? ` id="${wrapperId}"` : '';
   return`<div class="hitlist-wrapper"${idAttr}>
-    ${buildHeader(stats,settings,projDate,subtitleOverride)}
-    ${buildLegend(settings)}
+    <div class="hitlist-print-group">
+      ${buildHeader(stats,settings,projDate,subtitleOverride)}
+      ${buildLegend(settings)}
+    </div>
     <div class="hitlist-table-wrapper">${buildTable(results,colDefs,settings)}</div>
   </div>`;
 }
@@ -1804,8 +1988,8 @@ function buildHeader(stats, settings, projDate, subtitleOverride){
   // Multi-column info bar
   const infoBar = buildInfoBar(settings);
 
-  return`<div class="hitlist-header">
-    <div class="hitlist-header-top">${emblem}
+  // Returns sibling elements (not wrapped) — caller wraps in .hitlist-print-group
+  return`<div class="hitlist-header-top">${emblem}
       <div class="hitlist-title-block">
         <div class="hitlist-unit-name">${unitName} Medical Hit List</div>
         ${titleLine}
@@ -1819,8 +2003,7 @@ function buildHeader(stats, settings, projDate, subtitleOverride){
       <div class="hitlist-stat"><span class="hitlist-stat-label">Partial</span><span class="hitlist-stat-value stat-warn">${stats.partialPct}%</span></div>
       <div class="hitlist-stat"><span class="hitlist-stat-label">Indeterminate</span><span class="hitlist-stat-value stat-neutral">${stats.indeterminatePct}%</span></div>
     </div>
-    ${infoBar}
-  </div>`;
+    ${infoBar}`;
 }
 
 function buildInfoBar(settings){
@@ -2620,7 +2803,23 @@ function getSettingsFromUI(){
     thresholds, offEnlFilter:dom.offEnlFilter.value, sortBy:dom.sortBy.value,
     showRank:dom.showRank.checked, showSection:dom.showSection.checked,
     projectionDate, columnAliases,
+    pdfRepeatHeader:   dom.pdfRepeatHeader   ? dom.pdfRepeatHeader.checked   : true,
+    pdfRepeatSummary:  dom.pdfRepeatSummary  ? dom.pdfRepeatSummary.checked  : true,
+    pdfRepeatInfoBar:  dom.pdfRepeatInfoBar  ? dom.pdfRepeatInfoBar.checked  : true,
+    pdfRepeatLegend:   dom.pdfRepeatLegend   ? dom.pdfRepeatLegend.checked   : true,
+    pdfRepeatColNames: dom.pdfRepeatColNames ? dom.pdfRepeatColNames.checked : true,
+    accordionState:    getAccordionStateFromDOM(),
   };
+}
+
+/** Read current accordion expanded/collapsed state from DOM. */
+function getAccordionStateFromDOM() {
+  const accState = {};
+  document.querySelectorAll('.acc-section[id]').forEach(section => {
+    const key = section.querySelector('.acc-header')?.dataset.acc;
+    if (key) accState[key] = section.classList.contains('open');
+  });
+  return accState;
 }
 
 function refreshColumnCounter(){
@@ -2737,6 +2936,12 @@ function getDefaultSettings() {
     showRank:          true,
     showSection:       true,
     columnAliases:     {},  // e.g., { hiv: 'Lab', sickle: 'SC Test' }
+    accordionState:    { reportItems: true, displayOptions: true, unitCustomization: true, projectionDate: true, pdfExport: true },
+    pdfRepeatHeader:   true,
+    pdfRepeatSummary:  true,
+    pdfRepeatInfoBar:  true,
+    pdfRepeatLegend:   true,
+    pdfRepeatColNames: true,
   };
 }
 
@@ -2746,12 +2951,8 @@ function getDefaultSettings() {
 function saveSettings() {
   try {
     const s = getSettingsFromUI();
-    // projectionDate is a Date object — store as ISO string
-    const payload = Object.assign({}, s, {
-      projectionDate: s.projectionDate instanceof Date
-        ? s.projectionDate.toISOString()
-        : null,
-    });
+    const payload = Object.assign({}, s);
+    delete payload.projectionDate; // session-level, not persisted
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
   } catch(e) {
     console.warn('Hitlist Hatcher: could not save settings', e);
@@ -2820,8 +3021,15 @@ function applySettings(s) {
   // Immunization mode
   const immMode = g('immunDisplayMode', d.immunDisplayMode);
   state.immDisplayMode = immMode;
+  // Suppress transition during initial state application
+  dom.immModeGroupedBtn.style.transition = 'none';
+  dom.immModeIndividualBtn.style.transition = 'none';
   dom.immModeGroupedBtn.classList.toggle('active',     immMode === 'grouped');
   dom.immModeIndividualBtn.classList.toggle('active',  immMode === 'individual');
+  requestAnimationFrame(() => {
+    dom.immModeGroupedBtn.style.transition = '';
+    dom.immModeIndividualBtn.style.transition = '';
+  });
 
   // Immunization checkboxes
   const savedKeys = new Set(g('immunizationKeys', d.immunizationKeys));
@@ -2846,6 +3054,18 @@ function applySettings(s) {
   dom.infoColCount.value = colCount;
   const savedCols = g('infoColumns', d.infoColumns);
   initInfoColumns(savedCols);
+
+  // PDF export toggles
+  if (dom.pdfRepeatHeader)   dom.pdfRepeatHeader.checked   = g('pdfRepeatHeader',   d.pdfRepeatHeader);
+  if (dom.pdfRepeatSummary)  dom.pdfRepeatSummary.checked  = g('pdfRepeatSummary',  d.pdfRepeatSummary);
+  if (dom.pdfRepeatInfoBar)  dom.pdfRepeatInfoBar.checked  = g('pdfRepeatInfoBar',  d.pdfRepeatInfoBar);
+  if (dom.pdfRepeatLegend)   dom.pdfRepeatLegend.checked   = g('pdfRepeatLegend',   d.pdfRepeatLegend);
+  if (dom.pdfRepeatColNames) dom.pdfRepeatColNames.checked = g('pdfRepeatColNames', d.pdfRepeatColNames);
+
+  // Accordion state — MUST be applied before the TST dispatch below,
+  // which triggers onSettingsChanged → saveSettings → getAccordionStateFromDOM().
+  // If accordion state isn't in the DOM yet, the save overwrites it with all-open defaults.
+  applyAccordionState(g('accordionState', d.accordionState));
 
   // TST sub visibility — run through updateTstSub for full consistency
   // (visibility + combine auto-clear when only one box checked)
@@ -2876,12 +3096,11 @@ function wireSettingsHandlers() {
     try {
       const s = getSettingsFromUI();
       const payload = Object.assign({}, s, {
-        projectionDate: s.projectionDate instanceof Date
-          ? s.projectionDate.toISOString()
-          : null,
         _version: APP_VERSION,
         _exported: new Date().toISOString(),
       });
+      delete payload.accordionState;  // device-level UI pref, not report config
+      delete payload.projectionDate;  // session-level, time-sensitive — always use calculated default
       const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'text/plain' });
       const url  = URL.createObjectURL(blob);
       const a    = document.createElement('a');
@@ -2903,7 +3122,10 @@ function wireSettingsHandlers() {
       try {
         const s = JSON.parse(ev.target.result);
         if(typeof s !== 'object' || s === null) throw new Error('Invalid settings file.');
+        // Preserve accordion state — it's device-level and stripped from exports
+        const savedAccState = getAccordionStateFromDOM();
         applySettings(s);
+        applyAccordionState(savedAccState);
         saveSettings();
       } catch(err) {
         alert('Could not import settings: ' + err.message + '\nMake sure you are using a settings file exported from Hitlist Hatcher.');
@@ -2922,79 +3144,85 @@ function wireSettingsHandlers() {
 //   width:  (11.69 - 0.35 - 0.35) × 96 = 1055 px
 //   height: (8.27  - 0.35 - 0.45) × 96 =  718 px
 const PRINT_WIDTH_PX  = 1055;
-const PRINT_PAGE_H_PX =  718;
+const PRINT_PAGE_H_PX =  717;  // floor(7.47 × 96) — round DOWN for safety
+const PRINT_SAFETY_PX =    4;  // sub-pixel measurement buffer (not a full row)
 
 // Core export helper — used by all three export buttons.
 //
-// Strategy
-// ─────────
-// position:fixed on .hitlist-header / .hitlist-legend causes Chrome to
-// render those elements at the top of every printed page automatically.
+// Strategy (v3.5.0)
+// ──────────────────
+// Instead of position:fixed (which repeats on ALL pages with no per-page
+// control), the export builds separate "page sections" — each containing
+// a header block, column names, and a chunk of data rows. Page 1 gets all
+// header elements; pages 2+ get only toggled-ON elements. Page breaks are
+// forced via break-before:page on each section after the first.
 //
-// The overlap problem (fixed header obscures top rows on pages 2+) is solved
-// with two complementary mechanisms:
-//   • Page 1 : padding-top on .hitlist-table-wrapper (set via #printHeaderPad)
-//              pushes the table below the fixed header.
-//   • Pages 2+: a column-name clone <tr> with class .print-col-names-pagebreak
-//              is injected before every P-th data row. It carries break-before:page
-//              (forces the page break) and padding-top:headerH on each <th>
-//              (reserves the fixed-header zone), so column names appear flush
-//              below the header with no gap and no separate spacer row.
-//
-// P (rows per page) is calculated from live measurements at print dimensions
-// so the layout is accurate regardless of column count or zoom level.
+// This eliminates all position:fixed Chrome quirks and gives full control
+// over what appears on each page.
 function exportWrapperAsPdf(wrapperId) {
   const source = wrapperId
     ? document.getElementById(wrapperId)
     : dom.reportOutput.querySelector('.hitlist-wrapper');
   if (!source) return;
 
+  const settings = getSettingsFromUI();
+
   try {
-    // Clone the full wrapper (original DOM structure) into printOutput
+    // ── 0. Clone into off-screen container for measurement ──────
     dom.printOutput.innerHTML = source.outerHTML;
 
-    // ── 0. Strip exclusion artifacts from clone ──────────────────
-    // Action column and hidden (excluded) rows must be removed before
-    // any measurements so row counts and page-break math are correct.
+    // Strip exclusion artifacts before measurement
     dom.printOutput.querySelectorAll('.col-action').forEach(el => el.remove());
     dom.printOutput.querySelectorAll('tr[style*="display: none"]').forEach(el => el.remove());
 
-    // ── 1. Measure heights at print dimensions ───────────────────
-    // Temporarily reveal off-screen at the correct print width so that
-    // offsetHeight returns accurate values for header and row elements.
+    // ── 1. Measure heights at print dimensions ──────────────────
     dom.printOutput.style.cssText =
       `display:block;visibility:hidden;position:absolute;` +
       `top:-99999px;left:0;width:${PRINT_WIDTH_PX}px;`;
 
-    // Apply print font-size overrides inline so measured heights match
-    // what the browser will actually render in @media print.
+    // Apply print font-size overrides for accurate measurement
     const pName  = dom.printOutput.querySelector('.hitlist-unit-name');
     const pTitle = dom.printOutput.querySelector('.hitlist-title-line');
     if (pName)  pName.style.fontSize  = '18px';
     if (pTitle) pTitle.style.fontSize = '12px';
 
-    const pHeader  = dom.printOutput.querySelector('.hitlist-header');
-    const pLegend  = dom.printOutput.querySelector('.hitlist-legend');
-    const pHeaderH = pHeader ? pHeader.offsetHeight : 0;   // header block only
-    const pLegendH = pLegend ? pLegend.offsetHeight : 0;
-    const headerH  = pHeaderH + pLegendH;                  // combined (for padding/spacers)
+    // Measure each header element independently
+    const headerEls = [
+      { selector: '.hitlist-header-top', key: 'pdfRepeatHeader' },
+      { selector: '.hitlist-stats-bar',  key: 'pdfRepeatSummary' },
+      { selector: '.hitlist-info-bar',   key: 'pdfRepeatInfoBar' },
+      { selector: '.hitlist-legend',     key: 'pdfRepeatLegend' },
+    ];
 
-    // Apply print td/th overrides inline so rowH and colNamesH match actual
-    // print rendering (print CSS: font-size:10px, padding:4px 3px).
+    let allHeaderH = 0;
+    let repeatingH = 0;
+    const headerMeasurements = [];
+    for (const { selector, key } of headerEls) {
+      const el = dom.printOutput.querySelector(selector);
+      if (!el) continue;
+      const h = el.offsetHeight;
+      const repeats = settings[key] !== false;
+      headerMeasurements.push({ selector, repeats, height: h });
+      allHeaderH += h;
+      if (repeats) repeatingH += h;
+    }
+
+    // Measure table cells at print sizes
     const allCells = dom.printOutput.querySelectorAll('.hitlist-table td, .hitlist-table th');
     allCells.forEach(el => {
       el.style.fontSize = '10px';
       el.style.padding  = '4px 3px';
     });
 
-    const colNamesRow = dom.printOutput.querySelector('.hitlist-table thead tr');
-    const colNamesH   = colNamesRow ? colNamesRow.offsetHeight : 22;
+    const colNamesEl = dom.printOutput.querySelector('.hitlist-table thead tr');
+    const colNamesH  = colNamesEl ? colNamesEl.offsetHeight : 22;
 
     const firstRow = dom.printOutput.querySelector('.hitlist-table tbody tr');
     const rowH     = Math.max(firstRow ? firstRow.offsetHeight : 20, 1);
 
-    // Reset measurement state — printOutput returns to display:none via CSS
-    dom.printOutput.style.cssText = '';
+    // ── 2. Reset inline measurement styles, then capture HTML ───
+    // Resetting before capture ensures serialized HTML is clean —
+    // the dynamic print stylesheet handles font/padding overrides.
     if (pName)  pName.style.fontSize  = '';
     if (pTitle) pTitle.style.fontSize = '';
     allCells.forEach(el => {
@@ -3002,74 +3230,78 @@ function exportWrapperAsPdf(wrapperId) {
       el.style.padding  = '';
     });
 
-    // ── 2. Calculate rows per page ───────────────────────────────
-    // Subtract 2 rows as a safety margin against measurement rounding.
-    const P = Math.max(5, Math.floor((PRINT_PAGE_H_PX - headerH - colNamesH) / rowH) - 1);
+    // Capture clean HTML from measured elements
+    const headerData = headerMeasurements.map(m => {
+      const el = dom.printOutput.querySelector(m.selector);
+      return { ...m, html: el ? el.outerHTML : '' };
+    });
 
-    // ── 3. Insert spacer + column-name clone rows into tbody ───────
-    // Before every P-th data row, inject two rows:
-    //   a) A spacer <tr> with break-before:page and height:headerH —
-    //      this forces a new page and reserves the zone the fixed
-    //      header occupies so it doesn't overlap real data.
-    //   b) A clone of the <thead> column-name row — gives each page
-    //      its own visible column headers below the fixed header zone.
-    const tbody      = dom.printOutput.querySelector('.hitlist-table tbody');
-    const colNamesEl = dom.printOutput.querySelector('.hitlist-table thead tr');
-    const rows       = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
+    const colNamesHTML = colNamesEl ? `<tr>${colNamesEl.innerHTML}</tr>` : '';
 
-    // Determine insert positions: before rows[P], rows[2P], rows[3P]…
-    const insertAt = [];
-    for (let i = P; i < rows.length; i += P) insertAt.push(i);
+    const tbody = dom.printOutput.querySelector('.hitlist-table tbody');
+    const dataRows = tbody ? Array.from(tbody.querySelectorAll(':scope > tr')) : [];
+    const rowsHTML = dataRows.map(tr => tr.outerHTML);
 
-    // ── 3a. Insert page-break colClones (pages 2+) ──────────────
-    // Strategy: no separate spacer row. Instead, the colClone itself carries
-    // break-before:page to force the page break, and padding-top:headerH on
-    // each <th> to push the column-name text below the fixed header that
-    // overlays the top of every new page. This avoids the height-mismatch gap
-    // that a separate spacer row introduced.
-    // Insert in reverse order so earlier row indices stay valid.
-    for (let j = insertAt.length - 1; j >= 0; j--) {
-      if (colNamesEl && tbody) {
-        const clone = colNamesEl.cloneNode(true);
-        clone.className = 'print-col-names-repeat print-col-names-pagebreak';
-        tbody.insertBefore(clone, rows[insertAt[j]]);
+    // Reset measurement container
+    dom.printOutput.style.cssText = '';
+
+    // ── 3. Calculate rows per page ──────────────────────────────
+    const repeatColNames = settings.pdfRepeatColNames !== false;
+    const colH = repeatColNames ? colNamesH : 0;
+
+    // Page 1 rows: full header (all elements) + column names always shown
+    const P1 = Math.max(3, Math.floor((PRINT_PAGE_H_PX - allHeaderH - colNamesH - PRINT_SAFETY_PX) / rowH));
+
+    // Pages 2+ rows: only repeating header elements + column names if toggled ON
+    const P2 = Math.max(3, Math.floor((PRINT_PAGE_H_PX - repeatingH - colH - PRINT_SAFETY_PX) / rowH));
+
+    // ── 4. Chunk rows into page groups ──────────────────────────
+    const pageChunks = [];
+    let idx = 0;
+    // First chunk uses P1
+    pageChunks.push(rowsHTML.slice(idx, idx + P1));
+    idx += P1;
+    // Remaining chunks use P2
+    while (idx < rowsHTML.length) {
+      pageChunks.push(rowsHTML.slice(idx, idx + P2));
+      idx += P2;
+    }
+
+    // ── 5. Build page sections HTML ─────────────────────────────
+    // Build the header HTML for page 1 (all elements) and pages 2+ (toggled-ON only)
+    const page1HeaderHTML = headerData.map(d => d.html).join('\n    ');
+    const repeatHeaderHTML = headerData.filter(d => d.repeats).map(d => d.html).join('\n    ');
+
+    // Get the <table> opening tag with its classes (preserve any wrapper-specific classes)
+    const tableClasses = 'hitlist-table';
+
+    let html = '';
+    pageChunks.forEach((chunk, i) => {
+      const isFirst = (i === 0);
+      const pageBreak = isFirst ? '' : ' print-page-break';
+      const headerBlock = isFirst ? page1HeaderHTML : repeatHeaderHTML;
+      const showColNames = isFirst || repeatColNames;
+
+      html += `<div class="print-page-section${pageBreak}">`;
+      if (headerBlock) {
+        html += `<div class="print-page-header">${headerBlock}</div>`;
       }
-    }
+      html += `<table class="${tableClasses}">`;
+      if (showColNames && colNamesHTML) {
+        html += `<thead>${colNamesHTML}</thead>`;
+      }
+      html += `<tbody>${chunk.join('')}</tbody>`;
+      html += `</table>`;
+      html += `</div>`;
+    });
 
-    // ── 3b. Insert page-1 colClone at very start of tbody ───────
-    // <thead> is suppressed in print (injected CSS below) to stop Chrome from
-    // rendering its own unpredictable repetition. This clone replaces it on
-    // page 1. The .hitlist-table-wrapper padding-top already clears the header.
-    if (colNamesEl && tbody) {
-      const firstClone = colNamesEl.cloneNode(true);
-      firstClone.className = 'print-col-names-repeat print-col-names-first';
-      tbody.insertBefore(firstClone, tbody.firstChild);
-    }
+    dom.printOutput.innerHTML = html;
 
-    // ── 4. Inject dynamic print styles ──────────────────────────
-    let styleEl = document.getElementById('printHeaderPad');
-    if (!styleEl) {
-      styleEl = document.createElement('style');
-      styleEl.id = 'printHeaderPad';
-      document.head.appendChild(styleEl);
-    }
-    styleEl.textContent =
-      `@media print {
-         /* Page 1: push table below fixed header */
-         .print-only .hitlist-table-wrapper { padding-top: ${headerH}px; }
-         /* Legend: position directly below header block */
-         .print-only .hitlist-legend { top: ${pHeaderH}px; }
-         /* Suppress native <thead> repetition — we own column names via injected rows */
-         .print-only .hitlist-table thead { display: none !important; }
-         /* All column-name clone rows: visible in print */
-         .print-col-names-repeat { display: table-row !important; }
-         .print-col-names-repeat th { font-size: 10px !important; padding: 4px 3px !important; }
-         /* Page-break clones: force page break, then padding-top pushes text
-            below the fixed header — no separate spacer row needed */
-         .print-col-names-pagebreak { break-before: page !important; page-break-before: always !important; }
-         .print-col-names-pagebreak th { padding-top: ${headerH + 4}px !important; }
-       }`;
+    // Clean up any leftover dynamic style element from prior export approach
+    const oldStyleEl = document.getElementById('printHeaderPad');
+    if (oldStyleEl) oldStyleEl.remove();
 
+    // ── 6. Print ────────────────────────────────────────────────
     window.print();
   } catch(err) {
     captureError({
@@ -3080,7 +3312,7 @@ function exportWrapperAsPdf(wrapperId) {
         wrapperId: wrapperId || 'combined',
         rowCount: source.querySelectorAll('.hitlist-table tbody tr').length,
         colCount: source.querySelectorAll('.hitlist-table thead th').length,
-        headerFound: !!source.querySelector('.hitlist-header'),
+        headerFound: !!source.querySelector('.hitlist-header-top'),
         legendFound: !!source.querySelector('.hitlist-legend'),
       },
     });

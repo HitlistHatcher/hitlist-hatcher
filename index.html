@@ -41,6 +41,26 @@
 </head>
 <body>
 
+  <!-- ── SVG Icon Definitions (accordion section icons) ───────── -->
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none;">
+    <symbol id="ico-clipboard" viewBox="0 0 24 24">
+      <path d="M9 2a1 1 0 00-1 1H6a2 2 0 00-2 2v15a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2h-2a1 1 0 00-1-1H9zm0 2h6v1H9V4zM8 10h8v1.5H8V10zm0 4h8v1.5H8V14z"/>
+    </symbol>
+    <symbol id="ico-sliders" viewBox="0 0 24 24">
+      <rect x="4" y="3" width="16" height="2" rx="1"/><rect x="4" y="11" width="16" height="2" rx="1"/><rect x="4" y="19" width="16" height="2" rx="1"/>
+      <circle cx="8" cy="4" r="3"/><circle cx="16" cy="12" r="3"/><circle cx="11" cy="20" r="3"/>
+    </symbol>
+    <symbol id="ico-shield" viewBox="0 0 24 24">
+      <path d="M12 2L4 5.5V11c0 5.25 3.4 10.15 8 11.5 4.6-1.35 8-6.25 8-11.5V5.5L12 2z"/>
+    </symbol>
+    <symbol id="ico-calendar" viewBox="0 0 24 24">
+      <path d="M7 2v2H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V6a2 2 0 00-2-2h-2V2h-2v2H9V2H7zM5 10h14v10H5V10z"/>
+    </symbol>
+    <symbol id="ico-printer" viewBox="0 0 24 24">
+      <path d="M6 2h12v5H6V2zM4 8h16a2 2 0 012 2v6a2 2 0 01-2 2h-2v4H6v-4H4a2 2 0 01-2-2v-6a2 2 0 012-2zm2 7v5h12v-5H6zm12-3a1 1 0 100-2 1 1 0 000 2z"/>
+    </symbol>
+  </svg>
+
   <!-- ── Privacy Disclaimer Modal ───────────────────────────── -->
   <div class="modal-overlay" id="disclaimerModal">
     <div class="modal-box">
@@ -113,7 +133,7 @@
 
       <!-- Card 1: Upload -->
       <section class="card" id="uploadCard">
-        <h2 class="card-title">1. Upload MRRS File</h2>
+        <h2 class="card-title">Upload MRRS File</h2>
         <div class="upload-area" id="uploadArea">
           <div class="upload-icon">&#128196;</div>
           <p class="upload-prompt">
@@ -121,14 +141,21 @@
             or <label class="upload-link" for="fileInput">click to browse</label>
           </p>
           <input type="file" id="fileInput" accept=".xlsx,.xls" hidden />
-          <p class="upload-hint">Excel IMR Report (Details) export from MRRS</p>
         </div>
         <div class="upload-status" id="uploadStatus"></div>
       </section>
 
-      <!-- Card 2: Report Items -->
-      <section class="card" id="reportItemsCard">
-        <h2 class="card-title">2. Report Items</h2>
+      <!-- ── Accordion Sections ─────────────────────────── -->
+      <div class="acc-wrap">
+
+      <!-- Report Items -->
+      <div class="acc-section open" id="reportItemsCard">
+        <div class="acc-header" data-acc="reportItems">
+          <span class="acc-ico"><svg><use href="#ico-clipboard"/></svg></span>
+          <span class="acc-title">Report Items</span>
+          <span class="acc-chevron">&#9660;</span>
+        </div>
+        <div class="acc-body">
 
         <!-- Basic -->
         <div class="settings-group" id="basicItemsGroup">
@@ -203,16 +230,22 @@
           </label>
         </div>
 
-      </section>
+        </div>
+      </div>
 
-      <!-- Card 3: Display Options -->
-      <section class="card" id="displayCard">
-        <h2 class="card-title">3. Display Options</h2>
+      <!-- Display Options -->
+      <div class="acc-section open" id="displayCard">
+        <div class="acc-header" data-acc="displayOptions">
+          <span class="acc-ico"><svg><use href="#ico-sliders"/></svg></span>
+          <span class="acc-title">Display Options</span>
+          <span class="acc-chevron">&#9660;</span>
+        </div>
+        <div class="acc-body">
 
         <div class="settings-row">
           <label class="settings-label" for="offEnlFilter">Personnel</label>
           <select id="offEnlFilter" class="settings-select">
-            <option value="combined">Combined (Officers + Enlisted)</option>
+            <option value="combined">Combined Report</option>
             <option value="officer">Officers Only</option>
             <option value="enlisted">Enlisted Only</option>
             <option value="separate">Separate Reports</option>
@@ -255,11 +288,17 @@
           <div class="threshold-error" id="threshError"></div>
         </div>
 
-      </section>
+        </div>
+      </div>
 
-      <!-- Card 4: Unit Customization -->
-      <section class="card" id="unitCard">
-        <h2 class="card-title">4. Unit Customization</h2>
+      <!-- Unit Customization -->
+      <div class="acc-section open" id="unitCard">
+        <div class="acc-header" data-acc="unitCustomization">
+          <span class="acc-ico"><svg><use href="#ico-shield"/></svg></span>
+          <span class="acc-title">Unit Customization</span>
+          <span class="acc-chevron">&#9660;</span>
+        </div>
+        <div class="acc-body">
 
         <div class="settings-row" id="unitNameRow">
           <label class="settings-label" for="unitName">Unit Name</label>
@@ -291,14 +330,42 @@
           <div id="infoColContainer" class="info-col-container"></div>
         </div>
 
-      </section>
+        </div><!-- end .acc-body -->
+      </div><!-- end .acc-section unitCard -->
 
-      <!-- Card 5: Projection Date -->
-      <section class="card" id="projectionCard">
-        <h2 class="card-title">5. Projection Date</h2>
+      <!-- Projection Date -->
+      <div class="acc-section open" id="projectionCard">
+        <div class="acc-header" data-acc="projectionDate">
+          <span class="acc-ico"><svg><use href="#ico-calendar"/></svg></span>
+          <span class="acc-title">Projection Date</span>
+          <span class="acc-chevron">&#9660;</span>
+        </div>
+        <div class="acc-body">
         <input type="date" id="projectionDate" class="settings-date" />
         <p class="projection-hint">Personnel due on or before this date will appear on the hit list.</p>
-      </section>
+        </div><!-- end .acc-body -->
+      </div><!-- end .acc-section projectionCard -->
+
+      <!-- PDF Export -->
+      <div class="acc-section open" id="pdfExportCard">
+        <div class="acc-header" data-acc="pdfExport">
+          <span class="acc-ico"><svg><use href="#ico-printer"/></svg></span>
+          <span class="acc-title">PDF Export</span>
+          <span class="acc-chevron">&#9660;</span>
+        </div>
+        <div class="acc-body">
+          <div class="settings-group">
+            <div class="settings-group-label">Repeat on All Pages</div>
+            <label class="cb-label"><input type="checkbox" id="pdfRepeatHeader" checked /> Unit header</label>
+            <label class="cb-label"><input type="checkbox" id="pdfRepeatSummary" checked /> Readiness percentages</label>
+            <label class="cb-label"><input type="checkbox" id="pdfRepeatInfoBar" checked /> Info bar</label>
+            <label class="cb-label"><input type="checkbox" id="pdfRepeatLegend" checked /> Color legend</label>
+            <label class="cb-label"><input type="checkbox" id="pdfRepeatColNames" checked /> Column names</label>
+          </div>
+        </div><!-- end .acc-body -->
+      </div><!-- end .acc-section pdfExportCard -->
+
+      </div><!-- end .acc-wrap -->
 
       </div><!-- end .settings-scroll -->
 
@@ -412,6 +479,16 @@
 
       <!-- Tab: Version History -->
       <div class="about-tab-panel" id="aboutPanelVer">
+        <div class="about-version-entry">
+          <span class="about-version-badge">v3.5.0</span>
+          <span class="about-version-date">MAR 2026</span>
+          <ul class="about-version-notes">
+            <li>Settings panel reorganized into collapsible accordion sections with monochrome icons</li>
+            <li>PDF export options — choose which header elements repeat on printed pages</li>
+            <li>Version update notifications with what's new highlights</li>
+            <li>Upload section separated as standalone card; section numbering removed</li>
+          </ul>
+        </div>
         <div class="about-version-entry">
           <span class="about-version-badge">v3.4.0</span>
           <span class="about-version-date">MAR 2026</span>
@@ -561,6 +638,39 @@
           <summary class="feedback-diag-summary">View attached diagnostics</summary>
           <pre class="feedback-diag-pre" id="feedbackDiagPre"></pre>
         </details>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── What's New Modal ───────────────────────────────────── -->
+  <div class="modal-overlay hidden" id="whatsNewModal">
+    <div class="modal-box whatsnew-box">
+
+      <div class="modal-header">
+        <div class="modal-lock">&#127881;</div>
+        <div class="modal-header-text">
+          <div class="modal-title">What's New <span class="version-badge" id="whatsNewVersion"></span></div>
+          <div class="modal-subtitle">Hitlist Hatcher has been updated</div>
+        </div>
+      </div>
+
+      <div class="modal-body">
+        <ul class="whatsnew-list" id="whatsNewList">
+          <li>Settings panel reorganized into collapsible accordion sections</li>
+          <li>PDF export options — choose which header elements repeat on each page</li>
+          <li>Version update notifications — you're looking at it!</li>
+        </ul>
+        <p class="whatsnew-missed hidden" id="whatsNewMissed">
+          You also missed <strong id="whatsNewMissedCount">0</strong> earlier updates.
+        </p>
+        <p class="whatsnew-history">
+          <a href="#" class="whatsnew-history-link" id="whatsNewHistoryLink">View full version history</a>
+        </p>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-modal-accept" id="whatsNewDismiss">Got it</button>
       </div>
 
     </div>
