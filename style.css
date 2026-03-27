@@ -347,6 +347,10 @@ html, body {
   min-height: 18px;
   font-weight: 600;
 }
+.upload-status:empty {
+  min-height: 0;
+  margin-top: 0;
+}
 
 .upload-status.success { color: var(--green); }
 .upload-status.error   { color: var(--red); white-space: pre-line; }
@@ -606,6 +610,7 @@ html, body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   background: var(--navy-dark);
+  color: var(--white);
   border-top: 1px solid rgba(255,255,255,0.1);
 }
 
@@ -2290,9 +2295,7 @@ html, body {
 
 /* ── 16. PRINT / PDF STYLES ───────────────────────────────── */
 
-.print-only { display: none; }
-.print-page-spacer { display: none; }  /* shown only in @media print */
-.print-col-names-repeat { display: none; }  /* shown only in @media print */
+.print-only { display: none; } /* shown only in @media print */
 
 @media print {
 
@@ -2300,6 +2303,8 @@ html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
+
+  html, body { background: #fff !important; }
 
   /* Hide all UI — including .app-layout (prevents blank first page) */
   .app-header,
@@ -2318,6 +2323,7 @@ html, body {
 
   .print-only {
     display: block !important;
+    background: #fff !important;
   }
 
   /* Make emblem placeholder invisible in print — still occupies grid space
@@ -2338,41 +2344,24 @@ html, body {
     margin: 0.35in 0.35in 0.45in 0.35in;
   }
 
-  .hitlist-wrapper {
-    box-shadow: none;
-    border-radius: 0;
-    margin-bottom: 0;
+  /* Page sections — each contains a header block + table chunk.
+     exportWrapperAsPdf() builds these dynamically. */
+  .print-page-section {
     overflow: visible;
   }
+  .print-page-section table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-page-section tr { page-break-inside: avoid; }
 
-  /* Header elements: print-group wrapper becomes invisible to layout.
-     Individual elements (.hitlist-header-top, .hitlist-stats-bar,
-     .hitlist-info-bar, .hitlist-legend) are positioned by dynamic
-     styles injected via #printHeaderPad in exportWrapperAsPdf(). */
-  .hitlist-print-group {
-    display: contents;
+  .print-page-break {
+    break-before: page !important;
+    page-break-before: always !important;
   }
 
-  /* Base rules for fixed header elements — position/top set dynamically */
-  .hitlist-header-top,
-  .hitlist-stats-bar,
-  .hitlist-info-bar,
-  .hitlist-legend {
-    z-index: 10;
-    page-break-inside: avoid;
-    page-break-after: avoid;
-  }
-
-  /* Table wrapper must not clip content during print */
-  .hitlist-table-wrapper {
-    overflow: visible;
-    /* padding-top set dynamically via #printHeaderPad for page 1 */
-  }
-
-  .hitlist-table tr   { page-break-inside: avoid; }
-
-  .hitlist-table td,
-  .hitlist-table th {
+  .print-page-section td,
+  .print-page-section th {
     font-size: 10px;
     padding: 4px 3px;
   }
@@ -2413,6 +2402,11 @@ html, body {
   color: var(--gray-400);
 }
 .whatsnew-missed.hidden { display: none; }
+
+.whatsnew-history {
+  margin-top: 10px;
+  font-size: 12px;
+}
 
 .whatsnew-history-link {
   color: var(--navy);
