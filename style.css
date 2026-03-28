@@ -1593,11 +1593,11 @@ html, body {
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.12s ease;
-  border-left: 3px solid var(--yellow-light);
+  border-left: 3px solid var(--navy-mid);
   display: none;
 }
 .floating-tip.visible { display: block; opacity: 1; }
-.floating-tip strong  { color: var(--white); display: block; margin-bottom: 4px; font-size: 12.5px; }
+.floating-tip > strong { color: var(--white); display: block; margin-bottom: 6px; padding-bottom: 5px; font-size: 12.5px; border-bottom: 1px solid rgba(255,255,255,0.12); text-align: center; }
 .floating-tip p       { margin: 0; }
 .floating-tip p + p   { margin-top: 6px; }
 

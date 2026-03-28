@@ -11,7 +11,7 @@
 
 /* ── 1. CONSTANTS ──────────────────────────────────────────── */
 
-const APP_VERSION = '3.5.0';
+const APP_VERSION = '3.5.1';
 const MRRS_HEADER_ROW = 2;
 const MRRS_DATA_START = 3;
 const MRRS_SHEET_NAME = 'IMR Detail';
@@ -26,7 +26,7 @@ const MRRS_FORMAT_ERROR       = '✗ This file doesn\'t match the expected MRRS 
 
 const COL = {
   NAME:'Name', RANK:'Rank/Rate', COMP_DEPT:'Comp/Dept', PLATOON:'Platoon',
-  OFF_ENL:'Off Enl Indicator', SEX:'Sex', IMR_STATUS:'IMR Status', DEPLOYING:'Deploying',
+  OFF_ENL:'Off Enl Indicator', IMR_STATUS:'IMR Status', DEPLOYING:'Deploying',
   PHA_DT:'PHA Dt', PHA_DUE:'PHA Due',
   DENTAL_DT:'Dental Exam Dt', DENTAL_DUE:'Dental Exam Due', DENTAL_CLASS:'Dental Cond Code',
   HIV_DT:'HIV Test Dt', HIV_DUE:'HIV Test Due',
@@ -42,7 +42,7 @@ const COL = {
   G6PD_DUE:'G6PD Due Dt',
   SICKLE_DUE:'Sickle Cell Due Dt',
   TST_DUE:'TST Due Dt', TST_QUEST_DUE:'TST Quest Due',
-  MAMMOGRAM_DUE:'Mammogram Due', PAP_DUE:'Pap Smear Due',
+  MAMMOGRAM_DUE:'Mammogram Due', PAP_DUE:'Pap Smear Due', PREGNANT_DUE:'Pregnant Due',
   INFLUENZA_DUE:'Influenza Due',
   TDAP_DUE:'Tet/Dipth Due',
   TYPHOID_DUE:'Typhoid Due',
@@ -79,7 +79,7 @@ const WALKTHROUGH_KEY  = 'hitlistHatcher_walkthroughSeen';
 const VERSION_KEY     = 'hitlistHatcher_lastSeenVersion';
 
 const VERSION_HISTORY = [
-  '3.5.0','3.4.0','3.3.1','3.3.0','3.2.0','3.1.2','3.1.1','3.1.0','3.0.0'
+  '3.5.1','3.5.0','3.4.0','3.3.1','3.3.0','3.2.0','3.1.2','3.1.1','3.1.0','3.0.0'
 ];
 const COL_WARN_YELLOW  = 12;
 const COL_WARN_RED     = 14;
@@ -899,6 +899,7 @@ const WT_STEPS = [
 ];
 
 let wtCurrentStep = 0;
+let wtSavedAccordionState = null;
 
 function initWalkthrough() {
   if(!dom.wtWelcomeOverlay) return;
@@ -937,6 +938,7 @@ function wireWalkthroughHandlers() {
   dom.wtBtnStart = document.getElementById('wtBtnStart');
 
   dom.wtBtnStart.addEventListener('click', () => {
+    wtSavedAccordionState = getAccordionStateFromDOM();
     dom.wtWelcomeOverlay.classList.add('hidden');
     wtShowStep(0);
   });
@@ -1099,6 +1101,12 @@ function wtEnd() {
   wtClearSampleReport();
   wtClearAliasDemo();
   wtClearExclusionDemo();
+  // Restore accordion state captured at walkthrough start
+  if (wtSavedAccordionState) {
+    applyAccordionState(wtSavedAccordionState);
+    saveAccordionState();
+    wtSavedAccordionState = null;
+  }
   dom.wtDoneOverlay.classList.remove('hidden');
 }
 
@@ -1556,7 +1564,6 @@ function parseMRRS(workbook, preloadedRows) {
     personnel.push({
       name,rank,section:sect(row),
       offEnl:isOfficer?'Officer':'Enlisted',
-      sex:String(getCell(row,'SEX')).trim(),
       imrStatus:String(getCell(row,'IMR_STATUS')).trim(),
       deploying:isYes(getCell(row,'DEPLOYING')),
       // Core
@@ -1586,6 +1593,7 @@ function parseMRRS(workbook, preloadedRows) {
       tstQuestDue:  parseDate(getCell(row,'TST_QUEST_DUE')),
       mammogramDue: parseDate(getCell(row,'MAMMOGRAM_DUE')),
       papDue:       parseDate(getCell(row,'PAP_DUE')),
+      pregnantDue:  parseDate(getCell(row,'PREGNANT_DUE')),
       immunizations:{
         influenza:  {due:parseDate(getCell(row,'INFLUENZA_DUE')),   label:'Influenza'},
         tdap:       {due:parseDate(getCell(row,'TDAP_DUE')),        label:'TDap'},
@@ -1745,12 +1753,15 @@ function evaluatePerson(person, settings, today, projDate) {
   }
 
   let wellWomanResult = na;
-  if(settings.items.wellWoman && person.sex.toLowerCase()==='female') {
+  if(settings.items.wellWoman) {
     const mr = evaluateDateItem(person.mammogramDue, today, projDate, t);
     const pr = evaluateDateItem(person.papDue,       today, projDate, t);
     const status = SEVERITY[mr.status] >= SEVERITY[pr.status] ? mr.status : pr.status;
     const include = mr.includeInReport || pr.includeInReport;
-    wellWomanResult = {status, displayText:null, includeInReport:include};
+    const tooltipItems = [];
+    if(mr.includeInReport) tooltipItems.push({label:'Mammogram', due:person.mammogramDue});
+    if(pr.includeInReport) tooltipItems.push({label:'Pap Smear', due:person.papDue});
+    wellWomanResult = {status, displayText:null, includeInReport:include, tooltipItems};
   }
 
   const immKeys = settings.immunizationKeys || [];
@@ -1870,6 +1881,7 @@ function renderReport(results, stats, settings, today, projDate){
     dom.reportOutput.innerHTML=html;
     wireImmTooltips();
     wireTstTooltip();
+    wireWellWomanTooltip();
     wireRowExclusion();
     setExportBarMode('separate', officers.length===0, enlisted.length===0);
     state.reportGenerated=true; return;
@@ -1882,6 +1894,7 @@ function renderReport(results, stats, settings, today, projDate){
   dom.reportOutput.innerHTML=buildHitListHTML(results,stats,settings,today,projDate,activeColDefs,null,null);
   wireImmTooltips();
   wireTstTooltip();
+  wireWellWomanTooltip();
   wireRowExclusion();
   setExportBarMode('single');
   state.reportGenerated=true;
@@ -1931,7 +1944,7 @@ function getColumnDefs(settings){
     if(settings.items.tst)      d.push({key:'tst',      label:resolveLabel('tst',settings),      type:'item'});
     if(settings.items.tstQuest) d.push({key:'tstQuest', label:resolveLabel('tstQuest',settings), type:'item'});
   }
-  if(settings.items.wellWoman)    d.push({key:'wellWoman',    label:resolveLabel('wellWoman',settings),    type:'item'});
+  if(settings.items.wellWoman)    d.push({key:'wellWoman',    label:resolveLabel('wellWoman',settings),    type:'well-woman'});
   // Immunizations
   if(settings.items.immunizations){
     if((settings.immunDisplayMode||'grouped')==='grouped'){
@@ -1962,6 +1975,9 @@ function getActiveColumnDefs(colDefs, results) {
     }
     if(col.type === 'tst-combined') {
       return results.some(r => r.items.tstCombined && r.items.tstCombined.includeInReport);
+    }
+    if(col.type === 'well-woman') {
+      return results.some(r => r.items.wellWoman && r.items.wellWoman.includeInReport);
     }
     // type === 'item'
     return results.some(r => {
@@ -2072,6 +2088,20 @@ function getCellHTML(result, col, settings){
     const tooltipData = JSON.stringify(items.map(i=>({label:i.label, due:i.due?i.due.getTime():null})));
     return`<td class="col-item ${statusToCss(tc.status)} tst-combined-cell" data-tooltip="${escHtml(tooltipData)}">${dateStr}</td>`;
   }
+  if(type === 'well-woman'){
+    const ww = result.items.wellWoman;
+    if(!ww || !ww.includeInReport) return`<td class="col-item cell-na">—</td>`;
+    const items = ww.tooltipItems || [];
+    const displayDue = items.length === 1
+      ? items[0].due
+      : items.reduce((a,b) => {
+          if(!a.due) return b; if(!b.due) return a;
+          return a.due <= b.due ? a : b;
+        }, items[0])?.due;
+    const dateStr = displayDue ? formatDate(displayDue) : 'Due';
+    const tooltipData = JSON.stringify(items.map(i=>({label:i.label, due:i.due?i.due.getTime():null})));
+    return`<td class="col-item ${statusToCss(ww.status)} well-woman-cell" data-tooltip="${escHtml(tooltipData)}">${dateStr}</td>`;
+  }
   if(type === 'item'){
     const ir = result.items[key];
     if(!ir || !ir.includeInReport) return`<td class="col-item cell-na">—</td>`;
@@ -2098,7 +2128,8 @@ function wireImmTooltips() {
           <span class="tip-imm-date">${escHtml(dateStr)}</span>
         </div>`;
       }).join('');
-      tip.innerHTML = `<strong>Due immunizations</strong><div class="tip-imm-grid">${rows}</div>`;
+      const title = items.length === 1 ? 'Immunization due' : 'Immunizations due';
+      tip.innerHTML = `<strong>${title}</strong><div class="tip-imm-grid">${rows}</div>`;
       tip.classList.add('visible');
       placeImmTip(e);
     });
@@ -2125,8 +2156,9 @@ function wireTstTooltip() {
   document.querySelectorAll('.tst-combined-cell').forEach(cell => {
     let items = [];
     try { items = JSON.parse(cell.dataset.tooltip || '[]'); } catch(e) { return; }
-    if(items.length <= 1) return; // only show tooltip when both are due
+    if(!items.length) return;
     cell.addEventListener('mouseenter', e => {
+      const title = items.length === 1 ? 'TST item due' : 'TST items due';
       const rows = items.map(i => {
         const dateStr = i.due ? formatDateMD(new Date(i.due)) : '';
         return `<div class="tip-imm-row">
@@ -2134,7 +2166,33 @@ function wireTstTooltip() {
           <span class="tip-imm-date">${escHtml(dateStr)}</span>
         </div>`;
       }).join('');
-      tip.innerHTML = `<strong>TST items due</strong><div class="tip-imm-grid">${rows}</div>`;
+      tip.innerHTML = `<strong>${title}</strong><div class="tip-imm-grid">${rows}</div>`;
+      tip.classList.add('visible');
+      placeImmTip(e);
+    });
+    cell.addEventListener('mousemove', placeImmTip);
+    cell.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+  });
+}
+
+// Wire fixed-position tooltips for Well-Woman cells.
+// Same pattern as wireTstTooltip — shares placeImmTip and floating-tip element.
+function wireWellWomanTooltip() {
+  const tip = dom.floatingTip;
+  document.querySelectorAll('.well-woman-cell').forEach(cell => {
+    let items = [];
+    try { items = JSON.parse(cell.dataset.tooltip || '[]'); } catch(e) { return; }
+    if(!items.length) return;
+    cell.addEventListener('mouseenter', e => {
+      const title = items.length === 1 ? 'Well-Woman item due' : 'Well-Woman items due';
+      const rows = items.map(i => {
+        const dateStr = i.due ? formatDateMD(new Date(i.due)) : '';
+        return `<div class="tip-imm-row">
+          <span class="tip-imm-name">${escHtml(i.label)}</span>
+          <span class="tip-imm-date">${escHtml(dateStr)}</span>
+        </div>`;
+      }).join('');
+      tip.innerHTML = `<strong>${title}</strong><div class="tip-imm-grid">${rows}</div>`;
       tip.classList.add('visible');
       placeImmTip(e);
     });
@@ -2553,6 +2611,17 @@ function initSettingsPanel(){
   dom.itemTst.addEventListener('change', updateTstSub);
   dom.itemTstQuest.addEventListener('change', updateTstSub);
 
+  // TST combine — auto-check both TST items when combine is toggled on
+  if (dom.itemTstCombine) {
+    dom.itemTstCombine.addEventListener('change', () => {
+      if (dom.itemTstCombine.checked) {
+        dom.itemTst.checked = true;
+        dom.itemTstQuest.checked = true;
+      }
+      refreshColumnCounter();
+    });
+  }
+
   // Dental checkbox
   dom.itemDental.addEventListener('change', onSettingsChanged);
 
@@ -2572,8 +2641,9 @@ function initSettingsPanel(){
   dom.immSelectAll.addEventListener('click',()=>{dom.immCheckboxes.querySelectorAll('.imm-cb').forEach(cb=>cb.checked=true);refreshColumnCounter();});
   dom.immClearAll.addEventListener('click', ()=>{dom.immCheckboxes.querySelectorAll('.imm-cb').forEach(cb=>cb.checked=false);refreshColumnCounter();});
 
-  // All checkboxes → column counter
-  document.querySelectorAll('input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',onSettingsChanged));
+  // All settings checkboxes → column counter (scoped to settings panel to
+  // avoid unnecessary saveSettings() calls from modal checkboxes)
+  document.querySelectorAll('#settingsPanel input[type="checkbox"]').forEach(cb=>cb.addEventListener('change',onSettingsChanged));
 
   // Selects
   dom.offEnlFilter.addEventListener('change',onSettingsChanged);
@@ -2595,6 +2665,11 @@ function initSettingsPanel(){
   }, DEBOUNCE_MS);
   dom.threshYellow.addEventListener('input', validateThresholds);
   dom.threshGreen.addEventListener('input',  validateThresholds);
+
+  // Projection date — auto-recover to default when cleared
+  dom.projectionDate.addEventListener('change', () => {
+    if (!dom.projectionDate.value) setDefaultProjectionDate();
+  });
 
   // Emblem upload
   dom.emblemInput.addEventListener('change',e=>{
